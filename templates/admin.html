@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}{{ ctx.t("nav-admin") }}{% endblock %}
+{% block content %}
+<h1>{{ ctx.t("admin-title") }}</h1>
+<p class="hint">{{ ctx.t("admin-intro") }}</p>
+<p>{{ ctx.t_count("admin-media-count", media_count) }}</p>
+<div class="table-wrap">
+<table class="users">
+  <thead><tr><th>{{ ctx.t("admin-name") }}</th><th>{{ ctx.t("admin-email") }}</th><th>{{ ctx.t("admin-entries") }}</th><th>{{ ctx.t("admin-last-login") }}</th></tr></thead>
+  <tbody>
+  {% for u in users %}
+  <tr>
+    <td>{{ u.name }}{% if u.is_admin %} <span class="tag">{{ ctx.t("admin-role-admin") }}</span>{% endif %}</td>
+    <td>{{ u.email }}</td>
+    <td>{{ u.entries }}</td>
+    <td>{{ ctx.date(u.last_login_at) }}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

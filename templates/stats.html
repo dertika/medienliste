@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}{{ ctx.t("nav-stats") }}{% endblock %}
+{% block content %}
+<h1>{{ ctx.t("stats-title") }}</h1>
+<div class="tiles">
+  {% for t in tiles %}
+  <div class="tile {{ t.class }}"><span class="num">{{ t.num }}</span><span>{{ t.icon }} {{ t.label }}</span></div>
+  {% endfor %}
+</div>
+<h2>{{ ctx.t("stats-per-year") }}</h2>
+{% if rows.is_empty() %}
+<p class="empty">{{ ctx.t("stats-empty") }}</p>
+{% else %}
+<div class="table-wrap">
+<table class="stats">
+  <thead><tr><th>{{ ctx.t("stats-year") }}</th>{% for h in head %}<th>{{ h.icon }} {{ h.label }}</th>{% endfor %}</tr></thead>
+  <tbody>
+  {% for r in rows %}
+  <tr>
+    <th scope="row">{{ r.year }}</th>
+    {% for c in r.cells %}<td><span class="bar {{ c.class }}" style="width: {{ c.pct }}%"></span><span class="val">{{ c.count }}</span></td>{% endfor %}
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+<p class="hint">{{ ctx.t("stats-hint") }}</p>
+{% endif %}
+{% endblock %}

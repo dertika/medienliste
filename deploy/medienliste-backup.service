@@ -1,0 +1,8 @@
+# Optional: zusätzliches Backup per systemd-Timer (zusätzlich zum eingebauten Intervall-Backup).
+# Ablage: ~/.config/systemd/user/medienliste-backup.service (+ .timer)
+[Unit]
+Description=Medienliste – SQLite-Backup
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/podman exec medienliste /usr/local/bin/medienliste backup

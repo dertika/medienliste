@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}{{ ctx.t("logged-out-title") }}{% endblock %}
+{% block content %}
+<div class="empty">
+  <h1>{{ ctx.t("logged-out-title") }}</h1>
+  <p>{{ ctx.t("logged-out-text") }}</p>
+  <a class="btn primary" href="{{ ctx.base }}auth/login">{{ ctx.t("action-login") }}</a>
+</div>
+{% endblock %}

@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}{% if is_edit %}{{ ctx.t("form-title-edit") }}{% else %}{{ ctx.t("form-title-new") }}{% endif %}{% endblock %}
+{% block content %}
+<h1>{% if is_edit %}{{ ctx.t("form-title-edit") }}{% else %}{{ ctx.t("form-title-new") }}{% endif %}</h1>
+{% if !is_edit %}<p class="hint">{{ ctx.t("form-intro") }}</p>{% endif %}
+{% if !error.is_empty() %}<p class="notice error" role="alert">{{ error }}</p>{% endif %}
+<form class="media-form" method="post" action="{{ action }}" enctype="multipart/form-data" data-type-form>
+  <input type="hidden" name="csrf" value="{{ ctx.csrf }}">
+  <fieldset class="type-toggle">
+    <legend>{{ ctx.t("filter-type") }}</legend>
+    <label class="book"><input type="radio" name="media_type" value="book"{% if f.media_type == "book" %} checked{% endif %}><span>📖 {{ ctx.t("type-book") }}</span></label>
+    <label class="audiobook"><input type="radio" name="media_type" value="audiobook"{% if f.media_type == "audiobook" %} checked{% endif %}><span>🎧 {{ ctx.t("type-audiobook") }}</span></label>
+    <label class="movie"><input type="radio" name="media_type" value="movie"{% if f.media_type == "movie" %} checked{% endif %}><span>🎬 {{ ctx.t("type-movie") }}</span></label>
+  </fieldset>
+  <label>{{ ctx.t("label-title") }} *<input name="title" value="{{ f.title }}" required maxlength="500"></label>
+  <label><span data-types="book audiobook"{% if f.hide("book audiobook") %} hidden{% endif %}>{{ ctx.t("label-subtitle") }}</span><span data-types="movie"{% if f.hide("movie") %} hidden{% endif %}>{{ ctx.t("label-original-title") }}</span><input name="subtitle" value="{{ f.subtitle }}" maxlength="500"></label>
+  <label><span data-types="book audiobook"{% if f.hide("book audiobook") %} hidden{% endif %}>{{ ctx.t("label-authors") }}</span><span data-types="movie"{% if f.hide("movie") %} hidden{% endif %}>{{ ctx.t("label-directors") }}</span><input name="authors" value="{{ f.authors }}" placeholder="{{ ctx.t("form-names-hint") }}"></label>
+  <label data-types="audiobook movie"{% if f.hide("audiobook movie") %} hidden{% endif %}><span data-types="audiobook"{% if f.hide("audiobook") %} hidden{% endif %}>{{ ctx.t("label-narrators") }}</span><span data-types="movie"{% if f.hide("movie") %} hidden{% endif %}>{{ ctx.t("label-cast") }}</span><input name="narrators" value="{{ f.narrators }}" placeholder="{{ ctx.t("form-names-hint") }}"></label>
+  <div class="row">
+    <label><span data-types="book audiobook"{% if f.hide("book audiobook") %} hidden{% endif %}>{{ ctx.t("label-series") }}</span><span data-types="movie"{% if f.hide("movie") %} hidden{% endif %}>{{ ctx.t("label-movie-series") }}</span><input name="series" value="{{ f.series }}" maxlength="300"></label>
+    <label class="narrow"><span data-types="book audiobook"{% if f.hide("book audiobook") %} hidden{% endif %}>{{ ctx.t("label-volume") }}</span><span data-types="movie"{% if f.hide("movie") %} hidden{% endif %}>{{ ctx.t("label-part") }}</span><input name="series_index" value="{{ f.series_index }}" maxlength="20" inputmode="decimal"></label>
+  </div>
+  <div class="row" data-types="book audiobook"{% if f.hide("book audiobook") %} hidden{% endif %}>
+    <label>ISBN<input name="isbn" value="{{ f.isbn }}" inputmode="numeric" maxlength="20"></label>
+    <label data-types="audiobook"{% if f.hide("audiobook") %} hidden{% endif %}>ASIN<input name="asin" value="{{ f.asin }}" maxlength="10" autocapitalize="characters"></label>
+  </div>
+  <div class="row">
+    <label class="narrow">{{ ctx.t("label-year") }}<input name="year" value="{{ f.year }}" inputmode="numeric" maxlength="4"></label>
+    <label><span data-types="book audiobook"{% if f.hide("book audiobook") %} hidden{% endif %}>{{ ctx.t("label-publisher") }}</span><span data-types="movie"{% if f.hide("movie") %} hidden{% endif %}>{{ ctx.t("label-studio") }}</span><input name="publisher" value="{{ f.publisher }}" maxlength="300"></label>
+    <label class="narrow">{{ ctx.t("label-language") }}<input name="language" value="{{ f.language }}" maxlength="20" placeholder="de"></label>
+  </div>
+  <label>{{ ctx.t("label-description") }}<textarea name="description" rows="6" maxlength="20000">{{ f.description }}</textarea></label>
+  <label>{{ ctx.t("label-cover") }}<input type="file" name="cover" accept="image/jpeg,image/png,image/webp,image/gif"></label>
+  {% if has_cover %}<label class="check"><input type="checkbox" name="remove_cover" value="1"> {{ ctx.t("form-remove-cover") }}</label>{% endif %}
+  {% if !is_edit %}
+  <fieldset class="status-choice">
+    <legend>{{ ctx.t("filter-status") }}</legend>
+    <label><input type="radio" name="status" value="done"{% if f.status == "done" %} checked{% endif %}> ✓ <span data-types="book"{% if f.hide("book") %} hidden{% endif %}>{{ ctx.t("status-done-book") }}</span><span data-types="audiobook"{% if f.hide("audiobook") %} hidden{% endif %}>{{ ctx.t("status-done-audiobook") }}</span><span data-types="movie"{% if f.hide("movie") %} hidden{% endif %}>{{ ctx.t("status-done-movie") }}</span></label>
+    <label><input type="radio" name="status" value="wanted"{% if f.status != "done" %} checked{% endif %}> ☆ <span data-types="book"{% if f.hide("book") %} hidden{% endif %}>{{ ctx.t("status-wanted-book") }}</span><span data-types="audiobook"{% if f.hide("audiobook") %} hidden{% endif %}>{{ ctx.t("status-wanted-audiobook") }}</span><span data-types="movie"{% if f.hide("movie") %} hidden{% endif %}>{{ ctx.t("status-wanted-movie") }}</span></label>
+    <label class="done-year">{{ ctx.t("label-done-year") }}<input type="number" name="done_year" value="{{ f.done_year }}" min="1900" max="2100" inputmode="numeric" placeholder="{{ ctx.t("year-unknown") }}"></label>
+  </fieldset>
+  {% endif %}
+  <div class="actions">
+    <button type="submit" class="btn primary">{{ ctx.t("action-save") }}</button>
+  </div>
+</form>
+{% endblock %}

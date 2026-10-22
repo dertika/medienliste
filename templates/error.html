@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="empty">
+  <h1>{{ title }}</h1>
+  <p>{{ message }}</p>
+  <a class="btn" href="{{ ctx.base }}suche">{{ ctx.t("action-home") }}</a>
+</div>
+{% endblock %}

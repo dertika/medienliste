@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}{{ m.title }}{% endblock %}
+{% block content %}
+<article class="detail {{ m.media_type.as_str() }}">
+  <div class="detail-cover">
+    {% if let Some(c) = cover %}<img src="{{ c }}" alt="{{ ctx.t("label-cover") }}">{% else %}<span class="cover-ph big" aria-hidden="true">{{ type_icon }}</span>{% endif %}
+  </div>
+  <div class="detail-main">
+    <span class="type-badge {{ m.media_type.as_str() }}">{{ type_icon }} {{ type_label }}</span>
+    <h1>{{ m.title }}</h1>
+    {% if let Some(st) = m.subtitle %}<p class="subtitle">{{ st }}</p>{% endif %}
+    {% if !m.authors.is_empty() %}<p class="authors">{{ authors_prefix }}{{ m.authors.join(", ") }}</p>{% endif %}
+    {% let s = s.clone() %}
+    {% include "_status.html" %}
+    {% if !added.is_empty() %}<p class="hint">{{ ctx.t("label-added") }} {{ added }}</p>{% endif %}
+    <dl class="facts">
+      {% if !m.narrators.is_empty() %}<dt>{{ narrators_label }}</dt><dd>{{ m.narrators.join(", ") }}</dd>{% endif %}
+      {% if let Some(se) = m.series %}<dt>{{ ctx.t("label-series") }}</dt><dd>{{ se }}{% if let Some(i) = m.series_index %} · {{ ctx.t("label-volume") }} {{ i }}{% endif %}</dd>{% endif %}
+      {% if let Some(y) = m.published_year %}<dt>{{ ctx.t("label-year") }}</dt><dd>{{ y }}</dd>{% endif %}
+      {% if let Some(p) = m.publisher %}<dt>{{ ctx.t("label-publisher") }}</dt><dd>{{ p }}</dd>{% endif %}
+      {% if let Some(l) = m.language %}<dt>{{ ctx.t("label-language") }}</dt><dd>{{ l }}</dd>{% endif %}
+      {% if let Some(i) = m.isbn13 %}<dt>ISBN-13</dt><dd>{{ i }}</dd>{% endif %}
+      {% if let Some(i) = m.isbn10 %}<dt>ISBN-10</dt><dd>{{ i }}</dd>{% endif %}
+      {% if let Some(a) = m.asin %}<dt>ASIN</dt><dd>{{ a }}</dd>{% endif %}
+      <dt>{{ ctx.t("label-source") }}</dt><dd>{{ source_label }}</dd>
+    </dl>
+  </div>
+  {% if !paragraphs.is_empty() %}
+  <section class="description">
+    <h2>{{ ctx.t("label-description") }}</h2>
+    {% for p in paragraphs %}<p>{{ p }}</p>{% endfor %}
+  </section>
+  {% endif %}
+  {% if can_edit || can_delete %}
+  <div class="actions">
+    {% if can_edit %}<a class="btn" href="{{ ctx.base }}medium/{{ m.id }}/bearbeiten">{{ ctx.t("action-edit") }}</a>{% endif %}
+    {% if can_delete %}
+    <form method="post" action="{{ ctx.base }}medium/{{ m.id }}/loeschen" data-confirm="{{ ctx.t("confirm-delete") }}">
+      <input type="hidden" name="csrf" value="{{ ctx.csrf }}">
+      <button type="submit" class="btn danger">{{ ctx.t("action-delete") }}</button>
+    </form>
+    {% endif %}
+  </div>
+  {% endif %}
+</article>
+{% endblock %}
