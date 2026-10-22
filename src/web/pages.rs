@@ -32,6 +32,12 @@ fn redirect_back(st: &AppState, return_to: &str, fallback: &str) -> Response {
     Redirect::to(&format!("{}{}", st.cfg.base_path(), target)).into_response()
 }
 
+/// Aktuelles Jahr in der konfigurierten Zeitzone.
+fn current_year(st: &AppState) -> i32 {
+    use chrono::Datelike;
+    chrono::Utc::now().with_timezone(&st.cfg.timezone).year()
+}
+
 fn can_edit(cu: &CurrentUser, m: &Media) -> bool {
     cu.user.is_admin || (m.source == "manual" && m.created_by == Some(cu.id()))
 }
@@ -59,6 +65,8 @@ struct SearchPage {
     cards: Vec<Card>,
     searched: bool,
     warning: String,
+    /// Quellenhinweis für TMDb (Pflicht laut Nutzungsbedingungen).
+    attribution: bool,
 }
 
 #[derive(Template)]
@@ -69,6 +77,8 @@ struct SearchResults {
     cards: Vec<Card>,
     searched: bool,
     warning: String,
+    /// Quellenhinweis für TMDb (Pflicht laut Nutzungsbedingungen).
+    attribution: bool,
 }
 
 pub async fn search(
@@ -105,18 +115,21 @@ pub async fn search(
             }
             cards.push(Card::from_hit(&ctx, h, known, &return_to));
         }
-        if !outcome.failed.is_empty() && outcome.hits.is_empty() {
+        if outcome.no_provider {
+            warning = ctx.t("search-no-provider");
+        } else if !outcome.failed.is_empty() && outcome.hits.is_empty() {
             warning = ctx.t("search-provider-error");
         }
         // Eigene Einträge zuerst – „Habe ich das schon?“ auf einen Blick.
         cards.sort_by_key(|c| c.status.status.is_none());
     }
 
+    let attribution = kind.is_movie() && st.providers.provider("tmdb").is_some();
     if is_htmx(&headers) {
-        return Ok(render(&SearchResults { ctx, q, cards, searched: true, warning }));
+        return Ok(render(&SearchResults { ctx, q, cards, searched: true, warning, attribution }));
     }
     let searched = !q.is_empty();
-    Ok(render(&SearchPage { ctx, q, typ: kind.as_str(), cards, searched, warning }))
+    Ok(render(&SearchPage { ctx, q, typ: kind.as_str(), cards, searched, warning, attribution }))
 }
 
 #[derive(Deserialize)]
@@ -196,7 +209,7 @@ pub async fn add_from_search(
         .map_err(AppError::Internal)?
         .ok_or(AppError::NotFound)?;
     let media_id = ensure_media(&st, &hit, cu.id()).await?;
-    entries::set_status(&st.pool, cu.id(), media_id, status).await?;
+    entries::set_status(&st.pool, cu.id(), media_id, status, current_year(&st)).await?;
     status_response(&st, &cu, &headers, media_id, &f.return_to, false).await
 }
 
@@ -223,7 +236,7 @@ pub async fn set_status(
     cu.check_csrf(&f.csrf)?;
     let status = Status::parse(&f.status).ok_or(AppError::BadRequest("error-badrequest-text"))?;
     media::get(&st.pool, id).await?.ok_or(AppError::NotFound)?;
-    entries::set_status(&st.pool, cu.id(), id, status).await?;
+    entries::set_status(&st.pool, cu.id(), id, status, current_year(&st)).await?;
     status_response(&st, &cu, &headers, id, &f.return_to, !f.show_remove.is_empty()).await
 }
 
@@ -235,6 +248,47 @@ pub struct ReturnForm {
     return_to: String,
     #[serde(default)]
     show_remove: String,
+}
+
+#[derive(Deserialize)]
+pub struct YearForm {
+    #[serde(default)]
+    csrf: String,
+    #[serde(default)]
+    year: String,
+    #[serde(default)]
+    return_to: String,
+    #[serde(default)]
+    show_remove: String,
+}
+
+/// Prüft ein vom Benutzer eingegebenes Jahr (leer = unbekannt).
+fn parse_done_year(s: &str, current_year: i32) -> Result<Option<i32>, AppError> {
+    let s = s.trim();
+    if s.is_empty() {
+        return Ok(None);
+    }
+    s.parse::<i32>()
+        .ok()
+        .filter(|y| (1900..=current_year + 1).contains(y))
+        .map(Some)
+        .ok_or(AppError::BadRequest("form-error-done-year"))
+}
+
+/// Ändert das Jahr, in dem der Benutzer das Medium gelesen/gehört/gesehen hat.
+pub async fn set_year(
+    State(st): State<AppState>,
+    cu: CurrentUser,
+    headers: HeaderMap,
+    Path(id): Path<i64>,
+    Form(f): Form<YearForm>,
+) -> Result<Response, AppError> {
+    cu.check_csrf(&f.csrf)?;
+    let year = parse_done_year(&f.year, current_year(&st))?;
+    if !entries::set_done_year(&st.pool, cu.id(), id, year).await? {
+        return Err(AppError::NotFound);
+    }
+    status_response(&st, &cu, &headers, id, &f.return_to, !f.show_remove.is_empty()).await
 }
 
 pub async fn remove_entry(
@@ -342,6 +396,8 @@ struct DetailPage {
     m: Media,
     type_label: String,
     type_icon: &'static str,
+    authors_prefix: String,
+    narrators_label: String,
     cover: Option<String>,
     source_label: String,
     paragraphs: Vec<String>,
@@ -373,6 +429,8 @@ pub async fn detail(
     Ok(render(&DetailPage {
         type_label: ctx.type_label(m.media_type),
         type_icon: type_icon(m.media_type),
+        authors_prefix: ctx.authors_prefix(m.media_type),
+        narrators_label: ctx.narrators_label(m.media_type),
         cover: cover_url(&ctx, &m.cover_file),
         source_label: source_label(&ctx, &m.source),
         added: entry.as_ref().map(|e| ctx.date(&e.added_at)).unwrap_or_default(),
@@ -403,6 +461,7 @@ pub struct FormValues {
     language: String,
     description: String,
     status: String,
+    done_year: String,
 }
 
 #[derive(Template)]
@@ -417,6 +476,11 @@ struct FormPage {
 }
 
 impl FormValues {
+    /// Soll ein Element mit `data-types` beim aktuellen Typ verborgen werden?
+    pub fn hide(&self, types: &str) -> bool {
+        !types.split(' ').any(|t| t == self.media_type)
+    }
+
     fn from_media(m: &Media) -> Self {
         FormValues {
             media_type: m.media_type.as_str().into(),
@@ -433,6 +497,7 @@ impl FormValues {
             language: m.language.clone().unwrap_or_default(),
             description: m.description.clone().unwrap_or_default(),
             status: String::new(),
+            done_year: String::new(),
         }
     }
 
@@ -453,7 +518,7 @@ impl FormValues {
         let kind = MediaType::parse(&self.media_type).ok_or("form-error-type")?;
         let title = opt(&self.title, 500).ok_or("form-error-title")?;
         let (mut isbn10, mut isbn13) = (None, None);
-        if !self.isbn.trim().is_empty() {
+        if !kind.is_movie() && !self.isbn.trim().is_empty() {
             let i = clean_isbn(&self.isbn).ok_or("form-error-isbn")?;
             if i.len() == 10 {
                 isbn13 = isbn10_to_13(&i);
@@ -462,7 +527,7 @@ impl FormValues {
                 isbn13 = Some(i);
             }
         }
-        let asin = match opt(&self.asin, 20) {
+        let asin = match opt(&self.asin, 20).filter(|_| kind.is_audiobook()) {
             Some(a) => {
                 let a = a.to_ascii_uppercase();
                 if a.len() != 10 || !a.chars().all(|c| c.is_ascii_alphanumeric()) {
@@ -483,7 +548,7 @@ impl FormValues {
             title,
             subtitle: opt(&self.subtitle, 500),
             authors: names(&self.authors),
-            narrators: if kind.is_audiobook() { names(&self.narrators) } else { vec![] },
+            narrators: if kind.has_narrators() { names(&self.narrators) } else { vec![] },
             description: opt(&self.description, 20000),
             isbn10,
             isbn13,
@@ -539,6 +604,7 @@ async fn parse_multipart(mut mp: Multipart) -> Result<ParsedForm, AppError> {
             "language" => v.language = text,
             "description" => v.description = text,
             "status" => v.status = text,
+            "done_year" => v.done_year = text,
             _ => {}
         }
     }
@@ -559,6 +625,7 @@ pub async fn new_form(State(st): State<AppState>, cu: CurrentUser, Query(nq): Qu
         media_type: MediaType::parse(&nq.typ).unwrap_or(MediaType::Book).as_str().into(),
         title: nq.titel.chars().take(500).collect(),
         status: "wanted".into(),
+        done_year: current_year(&st).to_string(),
         ..Default::default()
     };
     render(&FormPage {
@@ -599,8 +666,15 @@ pub async fn new_save(
         },
         None => None,
     };
+    let done_year = match parse_done_year(&p.values.done_year, current_year(&st)) {
+        Ok(y) => y,
+        Err(_) => return Ok(fail(ctx, p.values, "form-error-done-year")),
+    };
     let id = media::insert(&st.pool, &nm, cover.as_deref(), Some(cu.id())).await?;
-    entries::set_status(&st.pool, cu.id(), id, status).await?;
+    entries::set_status(&st.pool, cu.id(), id, status, current_year(&st)).await?;
+    if status == Status::Done {
+        entries::set_done_year(&st.pool, cu.id(), id, done_year).await?;
+    }
     Ok(Redirect::to(&format!("{}medium/{id}", st.cfg.base_path())).into_response())
 }
 
@@ -701,38 +775,84 @@ pub async fn delete_media(
 
 // ----- Statistik -----
 
+pub struct StatCell {
+    count: i64,
+    pct: i64,
+    class: &'static str,
+}
+
 pub struct StatRow {
-    year: i32,
-    books: i64,
-    audiobooks: i64,
-    books_pct: i64,
-    audiobooks_pct: i64,
+    year: String,
+    cells: Vec<StatCell>,
+}
+
+pub struct StatTile {
+    num: i64,
+    label: String,
+    class: &'static str,
+    icon: &'static str,
+}
+
+pub struct StatHead {
+    label: String,
+    icon: &'static str,
 }
 
 #[derive(Template)]
 #[template(path = "stats.html")]
 struct StatsPage {
     ctx: Ctx,
+    tiles: Vec<StatTile>,
+    head: Vec<StatHead>,
     rows: Vec<StatRow>,
-    s: entries::Stats,
 }
 
 pub async fn stats(State(st): State<AppState>, cu: CurrentUser) -> Result<Response, AppError> {
     let ctx = Ctx::new(&st, Some(&cu), "stats");
-    let s = entries::stats(&st.pool, cu.id(), st.cfg.timezone).await?;
-    let max = s.per_year.iter().map(|(_, b, a)| (*b).max(*a)).max().unwrap_or(1).max(1);
+    let s = entries::stats(&st.pool, cu.id()).await?;
+    let max = s.per_year.iter().flat_map(|(_, c)| c.iter().copied()).max().unwrap_or(1).max(1);
+    let types = MediaType::ALL;
     let rows = s
         .per_year
         .iter()
-        .map(|&(year, books, audiobooks)| StatRow {
-            year,
-            books,
-            audiobooks,
-            books_pct: books * 100 / max,
-            audiobooks_pct: audiobooks * 100 / max,
+        .map(|(year, counts)| StatRow {
+            year: year.map(|y| y.to_string()).unwrap_or_else(|| ctx.t("stats-no-year")),
+            cells: types
+                .iter()
+                .map(|t| StatCell {
+                    count: counts[t.index()],
+                    pct: counts[t.index()] * 100 / max,
+                    class: t.as_str(),
+                })
+                .collect(),
         })
         .collect();
-    Ok(render(&StatsPage { ctx, rows, s }))
+    let mut tiles = Vec::new();
+    for (counts, keys, wanted) in [
+        (&s.done, ["stats-books-read", "stats-audiobooks-heard", "stats-movies-seen"], false),
+        (&s.wanted, ["stats-books-wanted", "stats-audiobooks-wanted", "stats-movies-wanted"], true),
+    ] {
+        for t in types {
+            tiles.push(StatTile {
+                num: counts[t.index()],
+                label: ctx.t(keys[t.index()]),
+                class: if wanted { "" } else { t.as_str() },
+                icon: if wanted { "☆" } else { type_icon(t) },
+            });
+        }
+    }
+    let head = types
+        .iter()
+        .map(|t| StatHead {
+            label: ctx.t(match t {
+                MediaType::Book => "type-books",
+                MediaType::Audiobook => "type-audiobooks",
+                MediaType::Movie => "type-movies",
+            }),
+            icon: type_icon(*t),
+        })
+        .collect();
+    Ok(render(&StatsPage { ctx, tiles, head, rows }))
 }
 
 // ----- Admin -----

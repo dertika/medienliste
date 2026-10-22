@@ -60,7 +60,23 @@ impl Ctx {
         self.t(match t {
             MediaType::Book => "type-book",
             MediaType::Audiobook => "type-audiobook",
+            MediaType::Movie => "type-movie",
         })
+    }
+
+    /// Vorsatz vor der Urheber-Zeile auf der Detailseite (bei Filmen „Regie:“).
+    pub fn authors_prefix(&self, t: MediaType) -> String {
+        if t.is_movie() { format!("{} ", self.t("label-directed-by")) } else { String::new() }
+    }
+
+    /// Vorsatz vor Sprecher bzw. Darstellern in Karten.
+    pub fn narrators_prefix(&self, t: MediaType) -> String {
+        self.t(if t.is_movie() { "label-starring" } else { "label-narrated-by" })
+    }
+
+    /// Bezeichnung des Feldes `narrators`: Sprecher bzw. Darsteller.
+    pub fn narrators_label(&self, t: MediaType) -> String {
+        self.t(if t.is_movie() { "label-cast" } else { "label-narrators" })
     }
 
     pub fn status_label(&self, s: Status, t: MediaType) -> String {
@@ -94,10 +110,12 @@ pub struct StatusView {
     /// Für noch nicht gespeicherte Suchtreffer.
     pub source: String,
     pub external_id: String,
-    pub is_audiobook: bool,
     pub status: Option<&'static str>,
     pub status_text: String,
-    pub status_date: String,
+    /// Zusatz zum Status: Jahr bei „done“, „seit <Datum>“ bei „wanted“.
+    pub status_when: String,
+    /// Jahr als Formularwert (leer = unbekannt).
+    pub done_year: String,
     pub label_done: String,
     pub label_wanted: String,
     /// Zielseite für Formulare ohne JavaScript.
@@ -117,10 +135,15 @@ impl StatusView {
             media_id,
             source: String::new(),
             external_id: String::new(),
-            is_audiobook: kind.is_audiobook(),
             status: entry.map(|e| e.status.as_str()),
             status_text: entry.map(|e| ctx.status_label(e.status, kind)).unwrap_or_default(),
-            status_date: entry.map(|e| ctx.date(&e.status_changed_at)).unwrap_or_default(),
+            status_when: entry
+                .map(|e| match e.status {
+                    Status::Done => e.done_year.map(|y| y.to_string()).unwrap_or_default(),
+                    Status::Wanted => format!("{} {}", ctx.t("status-since"), ctx.date(&e.status_changed_at)),
+                })
+                .unwrap_or_default(),
+            done_year: entry.and_then(|e| e.done_year).map(|y| y.to_string()).unwrap_or_default(),
             label_done: ctx.status_label(Status::Done, kind),
             label_wanted: ctx.status_label(Status::Wanted, kind),
             return_to: return_to.to_string(),
@@ -141,6 +164,8 @@ pub struct Card {
     pub subtitle: String,
     pub authors: String,
     pub narrators: String,
+    /// „gelesen von“ bzw. „mit“ (Darsteller).
+    pub narrators_label: String,
     pub year: String,
     pub series: String,
     pub cover: Option<String>,
@@ -162,6 +187,7 @@ pub struct ListItem {
     pub cover: Option<String>,
     pub type_label: String,
     pub type_class: &'static str,
+    pub icon_id: &'static str,
     pub status_class: &'static str,
     pub status_text: String,
 }
@@ -183,8 +209,14 @@ impl ListItem {
             cover: cover_url(ctx, &m.cover_file),
             type_label: ctx.type_label(m.media_type),
             type_class: type_class(m.media_type),
+            icon_id: icon_id(m.media_type),
             status_class: e.status.as_str(),
-            status_text: ctx.status_label(e.status, m.media_type),
+            status_text: match e.done_year {
+                Some(y) if e.status == Status::Done => {
+                    format!("{} {y}", ctx.status_label(e.status, m.media_type))
+                }
+                _ => ctx.status_label(e.status, m.media_type),
+            },
         }
     }
 }
@@ -201,6 +233,16 @@ fn type_class(t: MediaType) -> &'static str {
     match t {
         MediaType::Book => "book",
         MediaType::Audiobook => "audiobook",
+        MediaType::Movie => "movie",
+    }
+}
+
+/// Symbol-ID im SVG-Sprite (`static/icons/sprite.svg`).
+pub fn icon_id(t: MediaType) -> &'static str {
+    match t {
+        MediaType::Book => "book",
+        MediaType::Audiobook => "headphones",
+        MediaType::Movie => "film",
     }
 }
 
@@ -208,6 +250,7 @@ pub fn type_icon(t: MediaType) -> &'static str {
     match t {
         MediaType::Book => "📖",
         MediaType::Audiobook => "🎧",
+        MediaType::Movie => "🎬",
     }
 }
 
@@ -220,6 +263,7 @@ pub fn source_label(ctx: &Ctx, source: &str) -> String {
         "googlebooks" => "source-googlebooks",
         "openlibrary" => "source-openlibrary",
         "audible" => "source-audible",
+        "tmdb" => "source-tmdb",
         "manual" => "source-manual",
         _ => "source-other",
     })
@@ -233,6 +277,7 @@ impl Card {
             subtitle: m.subtitle.clone().unwrap_or_default(),
             authors: m.authors.join(", "),
             narrators: m.narrators.join(", "),
+            narrators_label: ctx.narrators_prefix(m.media_type),
             year: m.published_year.map(|y| y.to_string()).unwrap_or_default(),
             series: series_line(&m.series, &m.series_index),
             cover: cover_url(ctx, &m.cover_file),
@@ -260,6 +305,7 @@ impl Card {
             subtitle: h.subtitle.clone().unwrap_or_default(),
             authors: h.authors.join(", "),
             narrators: h.narrators.join(", "),
+            narrators_label: ctx.narrators_prefix(kind),
             year: h.published_year.map(|y| y.to_string()).unwrap_or_default(),
             series: series_line(&h.series, &h.series_index),
             cover: h.cover_url.clone().filter(|u| u.starts_with("https://")),

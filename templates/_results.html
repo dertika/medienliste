@@ -15,4 +15,5 @@
   {% else %}
     <p class="hint center">{{ ctx.t("search-intro") }}</p>
   {% endif %}
+  {% if attribution %}<p class="attribution">{{ ctx.t("tmdb-attribution") }}</p>{% endif %}
 </div>

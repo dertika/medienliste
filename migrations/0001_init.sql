@@ -34,11 +34,11 @@ CREATE TABLE login_states (
 -- Medien sind global und werden zwischen Benutzern geteilt.
 CREATE TABLE media (
     id               INTEGER PRIMARY KEY,
-    media_type       TEXT    NOT NULL CHECK (media_type IN ('book', 'audiobook')),
+    media_type       TEXT    NOT NULL CHECK (media_type IN ('book', 'audiobook', 'movie')),
     title            TEXT    NOT NULL,
     subtitle         TEXT,
-    authors          TEXT    NOT NULL DEFAULT '[]',  -- JSON-Array
-    narrators        TEXT    NOT NULL DEFAULT '[]',  -- JSON-Array, nur Hörbuch
+    authors          TEXT    NOT NULL DEFAULT '[]',  -- JSON-Array: Autor(en) bzw. Regie
+    narrators        TEXT    NOT NULL DEFAULT '[]',  -- JSON-Array: Sprecher bzw. Darsteller
     description      TEXT,
     isbn10           TEXT,
     isbn13           TEXT,
@@ -68,6 +68,8 @@ CREATE TABLE user_media (
     status            TEXT    NOT NULL CHECK (status IN ('done', 'wanted')),
     status_changed_at TEXT    NOT NULL,
     added_at          TEXT    NOT NULL,
+    -- Jahr, in dem gelesen/gehört/gesehen wurde (vom Benutzer änderbar, NULL = unbekannt)
+    done_year         INTEGER,
     PRIMARY KEY (user_id, media_id)
 ) WITHOUT ROWID;
 CREATE INDEX user_media_user_status ON user_media(user_id, status, status_changed_at);

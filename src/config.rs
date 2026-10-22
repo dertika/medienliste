@@ -16,6 +16,7 @@ pub struct Config {
     pub timezone: Tz,
     pub oidc: OidcConfig,
     pub google_books_api_key: Option<String>,
+    pub tmdb_api_key: Option<String>,
     pub audible_marketplace: String,
     pub trusted_proxies: Vec<IpNet>,
     pub session_days: i64,
@@ -46,8 +47,9 @@ impl Config {
         let get = |k: &str| get(k).map(|v| v.trim().to_string()).filter(|v| !v.is_empty());
         let required = |k: &str| get(k).ok_or_else(|| anyhow!("Umgebungsvariable {k} fehlt"));
 
-        let mut base_url: Url =
-            required("MEDIENLISTE_BASE_URL")?.parse().context("MEDIENLISTE_BASE_URL ist keine gültige URL")?;
+        let mut base_url: Url = required("MEDIENLISTE_BASE_URL")?
+            .parse()
+            .context("MEDIENLISTE_BASE_URL ist keine gültige URL")?;
         if !base_url.path().ends_with('/') {
             let p = format!("{}/", base_url.path());
             base_url.set_path(&p);
@@ -113,6 +115,7 @@ impl Config {
                 required_group: get("MEDIENLISTE_OIDC_REQUIRED_GROUP"),
             },
             google_books_api_key: get("MEDIENLISTE_GOOGLE_BOOKS_API_KEY"),
+            tmdb_api_key: get("MEDIENLISTE_TMDB_API_KEY"),
             audible_marketplace: get("MEDIENLISTE_AUDIBLE_MARKETPLACE").unwrap_or_else(|| "de".into()),
             trusted_proxies,
             session_days,

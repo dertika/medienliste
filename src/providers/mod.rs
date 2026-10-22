@@ -7,6 +7,7 @@
 pub mod audible;
 pub mod googlebooks;
 pub mod openlibrary;
+pub mod tmdb;
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -28,6 +29,11 @@ pub trait Provider: Send + Sync {
     async fn search(&self, query: &str, limit: usize) -> Result<Vec<NewMedia>>;
     /// Details zu einer externen ID.
     async fn fetch(&self, external_id: &str) -> Result<Option<NewMedia>>;
+    /// Liefert die Suche nur Kurzdaten (z. B. ohne Regie), sodass beim Hinzufügen
+    /// immer die vollständigen Details geholt werden sollen?
+    fn fetch_on_add(&self) -> bool {
+        false
+    }
 }
 
 #[derive(Debug, Default)]
@@ -35,6 +41,8 @@ pub struct SearchOutcome {
     pub hits: Vec<NewMedia>,
     /// Provider, die mit Fehler geantwortet haben.
     pub failed: Vec<&'static str>,
+    /// Für diesen Medientyp ist gar kein Provider konfiguriert.
+    pub no_provider: bool,
 }
 
 const CACHE_TTL: Duration = Duration::from_secs(60 * 60);
@@ -62,11 +70,16 @@ impl Registry {
     }
 
     pub fn from_config(cfg: &Config, http: reqwest::Client) -> Self {
-        Self::new(vec![
+        let mut providers: Vec<Arc<dyn Provider>> = vec![
             Arc::new(googlebooks::GoogleBooks::new(http.clone(), cfg.google_books_api_key.clone())),
             Arc::new(openlibrary::OpenLibrary::new(http.clone())),
-            Arc::new(audible::Audible::new(http, &cfg.audible_marketplace)),
-        ])
+            Arc::new(audible::Audible::new(http.clone(), &cfg.audible_marketplace)),
+        ];
+        // Filme nur mit API-Key (TMDb erlaubt keine anonyme Suche).
+        if let Some(key) = &cfg.tmdb_api_key {
+            providers.push(Arc::new(tmdb::Tmdb::new(http, key.clone())));
+        }
+        Self::new(providers)
     }
 
     pub fn provider(&self, id: &str) -> Option<&Arc<dyn Provider>> {
@@ -74,7 +87,10 @@ impl Registry {
     }
 
     pub async fn search(&self, kind: MediaType, query: &str, limit: usize) -> SearchOutcome {
-        let mut out = SearchOutcome::default();
+        let mut out = SearchOutcome {
+            no_provider: !self.providers.iter().any(|p| p.media_type() == kind),
+            ..Default::default()
+        };
         for p in self.providers.iter().filter(|p| p.media_type() == kind) {
             match p.search(query, limit).await {
                 Ok(hits) if !hits.is_empty() => {
@@ -96,15 +112,24 @@ impl Registry {
     /// Die Daten stammen dadurch immer vom Provider, nie aus der Anfrage des Clients.
     pub async fn resolve(&self, source: &str, external_id: &str) -> Result<Option<NewMedia>> {
         let key = (source.to_string(), external_id.to_string());
-        if let Some((at, m)) = self.cache.lock().unwrap().get(&key)
-            && at.elapsed() < CACHE_TTL
-        {
-            return Ok(Some(m.clone()));
-        }
+        let cached = self.cache.lock().unwrap().get(&key).filter(|(at, _)| at.elapsed() < CACHE_TTL).cloned();
         let Some(p) = self.provider(source) else {
             return Ok(None);
         };
-        let m = p.fetch(external_id).await?;
+        if let Some((_, m)) = &cached
+            && !p.fetch_on_add()
+        {
+            return Ok(Some(m.clone()));
+        }
+        let m = match p.fetch(external_id).await {
+            Ok(m) => m,
+            // Details nicht abrufbar: auf die Kurzdaten aus der Suche zurückfallen.
+            Err(e) if cached.is_some() => {
+                tracing::info!(provider = p.id(), "Details nicht abrufbar, nutze Suchtreffer: {e:#}");
+                cached.map(|(_, m)| m)
+            }
+            Err(e) => return Err(e),
+        };
         if let Some(m) = &m {
             self.remember(std::slice::from_ref(m));
         }

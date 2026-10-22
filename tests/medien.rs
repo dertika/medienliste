@@ -1,0 +1,191 @@
+//! Filme und das Jahr „gelesen/gehört/gesehen“.
+
+mod common;
+
+use std::sync::Arc;
+
+use axum::http::{StatusCode, header};
+use chrono::Datelike;
+use common::*;
+use medienliste::models::MediaType;
+use medienliste::providers::Provider;
+
+fn this_year() -> i32 {
+    chrono::Utc::now().with_timezone(&chrono_tz::Europe::Berlin).year()
+}
+
+async fn done_year(h: &Harness, user_id: i64, media_id: i64) -> Option<i32> {
+    sqlx::query_scalar("SELECT done_year FROM user_media WHERE user_id = ?1 AND media_id = ?2")
+        .bind(user_id)
+        .bind(media_id)
+        .fetch_one(&h.pool)
+        .await
+        .unwrap()
+}
+
+async fn add_movie(h: &Harness, u: &TestUser, status: &str) -> i64 {
+    let (st, _, body) = h
+        .post_htmx(
+            "/suche/hinzufuegen",
+            u,
+            &[("source", "stubmovie"), ("external_id", "104"), ("status", status)],
+        )
+        .await;
+    assert_eq!(st, StatusCode::OK, "{body}");
+    sqlx::query_scalar("SELECT id FROM media WHERE source = 'stubmovie'").fetch_one(&h.pool).await.unwrap()
+}
+
+#[tokio::test]
+async fn movie_search_and_add_sets_current_year() {
+    let h = harness().await;
+    let a = h.user("user-a", false).await;
+
+    let (_, _, body) = h.get("/suche?typ=movie&q=lola", Some(&a)).await;
+    assert!(body.contains("Lola rennt"));
+    assert!(body.contains("Möchte ich sehen"));
+    assert!(body.contains("mit Testdarstellerin"));
+
+    let id = add_movie(&h, &a, "done").await;
+    assert_eq!(done_year(&h, a.id, id).await, Some(this_year()));
+    let (_, _, body) = h.get(&format!("/medium/{id}"), Some(&a)).await;
+    assert!(body.contains("Gesehen"));
+    assert!(body.contains("Regie: Testregie"));
+    assert!(body.contains("Darsteller"));
+    assert!(body.contains(&format!("value=\"{}\"", this_year())), "Jahr im Formular vorbelegt");
+
+    // Liste mit Typfilter
+    let (_, _, body) = h.get("/liste?typ=movie", Some(&a)).await;
+    assert!(body.contains("Lola rennt"));
+    assert!(body.contains(&format!("Gesehen {}", this_year())));
+    let (_, _, body) = h.get("/liste?typ=book", Some(&a)).await;
+    assert!(!body.contains("Lola rennt"));
+}
+
+#[tokio::test]
+async fn done_year_can_be_edited_and_drives_stats() {
+    let h = harness().await;
+    let a = h.user("user-a", false).await;
+    let id = add_movie(&h, &a, "done").await;
+
+    let (st, _, _) = h.post(&format!("/medium/{id}/jahr"), Some(&a), &[("year", "2015")]).await;
+    assert_eq!(st, StatusCode::SEE_OTHER);
+    assert_eq!(done_year(&h, a.id, id).await, Some(2015));
+    let (_, _, body) = h.get("/statistik", Some(&a)).await;
+    assert!(body.contains("<th scope=\"row\">2015</th>"), "{body}");
+    assert!(body.contains(r#"<span class="num">1</span><span>🎬 Filme gesehen"#));
+
+    // Leeres Jahr = unbekannt → eigene Zeile „ohne Jahr“.
+    h.post(&format!("/medium/{id}/jahr"), Some(&a), &[("year", "")]).await;
+    assert_eq!(done_year(&h, a.id, id).await, None);
+    let (_, _, body) = h.get("/statistik", Some(&a)).await;
+    assert!(body.contains("ohne Jahr"));
+
+    // Ungültige Jahre werden abgelehnt.
+    for bad in ["1800", "abc", &(this_year() + 5).to_string()] {
+        let (st, _, _) = h.post(&format!("/medium/{id}/jahr"), Some(&a), &[("year", bad)]).await;
+        assert_eq!(st, StatusCode::BAD_REQUEST, "{bad}");
+    }
+    assert_eq!(done_year(&h, a.id, id).await, None);
+}
+
+#[tokio::test]
+async fn status_change_resets_year() {
+    let h = harness().await;
+    let a = h.user("user-a", false).await;
+    let id = add_movie(&h, &a, "done").await;
+    h.post(&format!("/medium/{id}/jahr"), Some(&a), &[("year", "2010")]).await;
+
+    // Gleicher Status: Jahr bleibt.
+    h.post(&format!("/medium/{id}/status"), Some(&a), &[("status", "done")]).await;
+    assert_eq!(done_year(&h, a.id, id).await, Some(2010));
+    // Wechsel auf „möchte ich“: Jahr wird entfernt, Jahr-Bearbeitung nicht möglich.
+    h.post(&format!("/medium/{id}/status"), Some(&a), &[("status", "wanted")]).await;
+    assert_eq!(done_year(&h, a.id, id).await, None);
+    let (st, _, _) = h.post(&format!("/medium/{id}/jahr"), Some(&a), &[("year", "2011")]).await;
+    assert_eq!(st, StatusCode::NOT_FOUND);
+    // Wieder „gesehen“: aktuelles Jahr.
+    h.post(&format!("/medium/{id}/status"), Some(&a), &[("status", "done")]).await;
+    assert_eq!(done_year(&h, a.id, id).await, Some(this_year()));
+}
+
+#[tokio::test]
+async fn year_of_other_user_cannot_be_changed() {
+    let h = harness().await;
+    let a = h.user("user-a", false).await;
+    let b = h.user("user-b", false).await;
+    let id = add_movie(&h, &a, "done").await;
+    h.post(&format!("/medium/{id}/jahr"), Some(&a), &[("year", "2012")]).await;
+
+    // B hat keinen Eintrag → 404, A unverändert.
+    let (st, _, _) = h.post(&format!("/medium/{id}/jahr"), Some(&b), &[("year", "1999")]).await;
+    assert_eq!(st, StatusCode::NOT_FOUND);
+    assert_eq!(done_year(&h, a.id, id).await, Some(2012));
+
+    // B mit eigenem Eintrag ändert nur seinen.
+    h.post(&format!("/medium/{id}/status"), Some(&b), &[("status", "done")]).await;
+    h.post(&format!("/medium/{id}/jahr"), Some(&b), &[("year", "1999")]).await;
+    assert_eq!(done_year(&h, b.id, id).await, Some(1999));
+    assert_eq!(done_year(&h, a.id, id).await, Some(2012));
+
+    // Ohne gültiges CSRF-Token nichts.
+    let (st, _, _) =
+        h.post(&format!("/medium/{id}/jahr"), Some(&a), &[("year", "2000"), ("csrf", "x")]).await;
+    assert_eq!(st, StatusCode::FORBIDDEN);
+    assert_eq!(done_year(&h, a.id, id).await, Some(2012));
+}
+
+#[tokio::test]
+async fn manual_movie_with_year() {
+    use axum::body::Body;
+    use axum::http::Request;
+    let h = harness().await;
+    let a = h.user("user-a", false).await;
+    let boundary = "----medientest";
+    let mut body = String::new();
+    for (k, v) in [
+        ("csrf", a.csrf.as_str()),
+        ("media_type", "movie"),
+        ("title", "Der Himmel über Berlin"),
+        ("authors", "Wim Wenders"),
+        ("narrators", "Bruno Ganz, Otto Sander"),
+        ("isbn", "123"), // wird bei Filmen ignoriert
+        ("status", "done"),
+        ("done_year", "1995"),
+    ] {
+        body.push_str(&format!(
+            "--{boundary}\r\nContent-Disposition: form-data; name=\"{k}\"\r\n\r\n{v}\r\n"
+        ));
+    }
+    body.push_str(&format!("--{boundary}--\r\n"));
+    let req = Request::post("/neu")
+        .header(header::CONTENT_TYPE, format!("multipart/form-data; boundary={boundary}"))
+        .header(header::COOKIE, &a.cookie)
+        .header(header::ORIGIN, ORIGIN)
+        .body(Body::from(body))
+        .unwrap();
+    let (st, headers, body) = h.request(req).await;
+    assert_eq!(st, StatusCode::SEE_OTHER, "{body}");
+    let id: i64 = headers[header::LOCATION].to_str().unwrap().trim_start_matches("/medium/").parse().unwrap();
+    assert_eq!(done_year(&h, a.id, id).await, Some(1995));
+    let (t, isbn): (String, Option<String>) =
+        sqlx::query_as("SELECT media_type, isbn13 FROM media WHERE id = ?1")
+            .bind(id)
+            .fetch_one(&h.pool)
+            .await
+            .unwrap();
+    assert_eq!(t, "movie");
+    assert_eq!(isbn, None);
+    let (_, _, body) = h.get(&format!("/medium/{id}"), Some(&a)).await;
+    assert!(body.contains("Bruno Ganz, Otto Sander"));
+}
+
+#[tokio::test]
+async fn movie_search_without_provider_shows_hint() {
+    let providers: Vec<Arc<dyn Provider>> =
+        default_providers().into_iter().filter(|p| p.media_type() != MediaType::Movie).collect();
+    let h = harness_with("https://idp.invalid", providers).await;
+    let a = h.user("user-a", false).await;
+    let (_, _, body) = h.get("/suche?typ=movie&q=lola", Some(&a)).await;
+    assert!(body.contains("keine externe Quelle"));
+    assert!(body.contains("Manuell anlegen"));
+}

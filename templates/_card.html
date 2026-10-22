@@ -7,7 +7,7 @@
     <h3>{% if let Some(id) = card.media_id %}<a href="{{ ctx.base }}medium/{{ id }}">{{ card.title }}</a>{% else %}{{ card.title }}{% endif %}</h3>
     {% if !card.subtitle.is_empty() %}<p class="subtitle">{{ card.subtitle }}</p>{% endif %}
     {% if !card.authors.is_empty() %}<p class="authors">{{ card.authors }}</p>{% endif %}
-    {% if !card.narrators.is_empty() %}<p class="narrators">{{ ctx.t("label-narrated-by") }} {{ card.narrators }}</p>{% endif %}
+    {% if !card.narrators.is_empty() %}<p class="narrators">{{ card.narrators_label }} {{ card.narrators }}</p>{% endif %}
     <p class="meta">{% if !card.series.is_empty() %}<span>{{ card.series }}</span>{% endif %}{% if !card.year.is_empty() %}<span>{{ card.year }}</span>{% endif %}<span>{{ card.source_label }}</span></p>
     {% let s = card.status.clone() %}
     {% include "_status.html" %}

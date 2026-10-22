@@ -8,15 +8,17 @@ use serde::{Deserialize, Serialize};
 pub enum MediaType {
     Book,
     Audiobook,
+    Movie,
 }
 
 impl MediaType {
-    pub const ALL: [MediaType; 2] = [MediaType::Book, MediaType::Audiobook];
+    pub const ALL: [MediaType; 3] = [MediaType::Book, MediaType::Audiobook, MediaType::Movie];
 
     pub fn as_str(self) -> &'static str {
         match self {
             MediaType::Book => "book",
             MediaType::Audiobook => "audiobook",
+            MediaType::Movie => "movie",
         }
     }
 
@@ -24,12 +26,31 @@ impl MediaType {
         match s {
             "book" => Some(MediaType::Book),
             "audiobook" => Some(MediaType::Audiobook),
+            "movie" => Some(MediaType::Movie),
             _ => None,
+        }
+    }
+
+    /// Position in [`MediaType::ALL`] (für Zähler pro Typ).
+    pub fn index(self) -> usize {
+        match self {
+            MediaType::Book => 0,
+            MediaType::Audiobook => 1,
+            MediaType::Movie => 2,
         }
     }
 
     pub fn is_audiobook(self) -> bool {
         self == MediaType::Audiobook
+    }
+
+    pub fn is_movie(self) -> bool {
+        self == MediaType::Movie
+    }
+
+    /// Hat dieser Typ Mitwirkende neben dem Urheber (Sprecher bzw. Darsteller)?
+    pub fn has_narrators(self) -> bool {
+        self != MediaType::Book
     }
 }
 
@@ -65,8 +86,10 @@ impl Status {
         match (self, t) {
             (Status::Done, MediaType::Book) => "status-done-book",
             (Status::Done, MediaType::Audiobook) => "status-done-audiobook",
+            (Status::Done, MediaType::Movie) => "status-done-movie",
             (Status::Wanted, MediaType::Book) => "status-wanted-book",
             (Status::Wanted, MediaType::Audiobook) => "status-wanted-audiobook",
+            (Status::Wanted, MediaType::Movie) => "status-wanted-movie",
         }
     }
 }
@@ -139,6 +162,8 @@ pub struct Entry {
     pub status: Status,
     pub status_changed_at: DateTime<Utc>,
     pub added_at: DateTime<Utc>,
+    /// Jahr, in dem gelesen/gehört/gesehen wurde (nur bei Status „done“).
+    pub done_year: Option<i32>,
 }
 
 /// Normalisiert Text für die einfache Volltextsuche (Kleinbuchstaben, Umlaute vereinheitlicht).

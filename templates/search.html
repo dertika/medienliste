@@ -5,6 +5,7 @@
   <div class="type-toggle" role="radiogroup" aria-label="{{ ctx.t("filter-type") }}">
     <label class="book"><input type="radio" name="typ" value="book"{% if typ == "book" %} checked{% endif %}><span>📖 {{ ctx.t("type-books") }}</span></label>
     <label class="audiobook"><input type="radio" name="typ" value="audiobook"{% if typ == "audiobook" %} checked{% endif %}><span>🎧 {{ ctx.t("type-audiobooks") }}</span></label>
+    <label class="movie"><input type="radio" name="typ" value="movie"{% if typ == "movie" %} checked{% endif %}><span>🎬 {{ ctx.t("type-movies") }}</span></label>
   </div>
   <div class="search-row">
     <input id="q" type="search" name="q" value="{{ q }}" placeholder="{{ ctx.t("search-placeholder") }}" autocomplete="off" enterkeyhint="search"{% if q.is_empty() %} autofocus{% endif %}>

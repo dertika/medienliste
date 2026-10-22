@@ -14,10 +14,17 @@
     if (msg && !window.confirm(msg)) e.preventDefault();
   });
 
-  // Im Formular „Manuell anlegen“ Hörbuch-Felder nur bei Hörbüchern zeigen.
+  // Im Formular „Manuell anlegen“ nur die zum Typ passenden Felder und Bezeichnungen zeigen
+  // (Elemente mit data-types="book audiobook movie").
   function syncTypeForm(form) {
     var checked = form.querySelector("input[name=media_type]:checked");
-    form.classList.toggle("is-book", !!checked && checked.value === "book");
+    if (!checked) return;
+    form.querySelectorAll("[data-types]").forEach(function (el) {
+      el.hidden = el.getAttribute("data-types").split(" ").indexOf(checked.value) < 0;
+    });
+    var done = form.querySelector("input[name=status][value=done]");
+    var year = form.querySelector(".done-year");
+    if (done && year) year.hidden = !done.checked;
   }
   document.querySelectorAll("form[data-type-form]").forEach(function (form) {
     syncTypeForm(form);

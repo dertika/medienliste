@@ -9,12 +9,12 @@
     <span class="type-badge {{ m.media_type.as_str() }}">{{ type_icon }} {{ type_label }}</span>
     <h1>{{ m.title }}</h1>
     {% if let Some(st) = m.subtitle %}<p class="subtitle">{{ st }}</p>{% endif %}
-    {% if !m.authors.is_empty() %}<p class="authors">{{ m.authors.join(", ") }}</p>{% endif %}
+    {% if !m.authors.is_empty() %}<p class="authors">{{ authors_prefix }}{{ m.authors.join(", ") }}</p>{% endif %}
     {% let s = s.clone() %}
     {% include "_status.html" %}
     {% if !added.is_empty() %}<p class="hint">{{ ctx.t("label-added") }} {{ added }}</p>{% endif %}
     <dl class="facts">
-      {% if !m.narrators.is_empty() %}<dt>{{ ctx.t("label-narrators") }}</dt><dd>{{ m.narrators.join(", ") }}</dd>{% endif %}
+      {% if !m.narrators.is_empty() %}<dt>{{ narrators_label }}</dt><dd>{{ m.narrators.join(", ") }}</dd>{% endif %}
       {% if let Some(se) = m.series %}<dt>{{ ctx.t("label-series") }}</dt><dd>{{ se }}{% if let Some(i) = m.series_index %} · {{ ctx.t("label-volume") }} {{ i }}{% endif %}</dd>{% endif %}
       {% if let Some(y) = m.published_year %}<dt>{{ ctx.t("label-year") }}</dt><dd>{{ y }}</dd>{% endif %}
       {% if let Some(p) = m.publisher %}<dt>{{ ctx.t("label-publisher") }}</dt><dd>{{ p }}</dd>{% endif %}

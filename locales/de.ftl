@@ -16,16 +16,20 @@ nav-logout = Abmelden
 ## Medientypen
 type-book = Buch
 type-audiobook = Hörbuch
+type-movie = Film
 type-books = Bücher
 type-audiobooks = Hörbücher
+type-movies = Filme
 
 ## Status
-status-done = Gelesen/Gehört
-status-wanted = Möchte ich lesen/hören
+status-done = Gelesen/Gehört/Gesehen
+status-wanted = Möchte ich lesen/hören/sehen
 status-done-book = Gelesen
 status-done-audiobook = Gehört
+status-done-movie = Gesehen
 status-wanted-book = Möchte ich lesen
 status-wanted-audiobook = Möchte ich hören
+status-wanted-movie = Möchte ich sehen
 status-since = seit
 status-not-in-list = Nicht in deiner Liste
 
@@ -33,22 +37,24 @@ status-not-in-list = Nicht in deiner Liste
 source-googlebooks = Google Books
 source-openlibrary = Open Library
 source-audible = Audible
+source-tmdb = TMDB
 source-manual = Manuell angelegt
 source-other = Andere Quelle
 
 ## Suche
-search-placeholder = Titel, Autor, ISBN oder ASIN
+search-placeholder = Titel, Autor, Regie, ISBN oder ASIN
 search-button = Suchen
 search-loading = Suche läuft …
-search-intro = Suche nach einem Buch oder Hörbuch – du siehst sofort, ob es schon in deiner Liste ist.
+search-intro = Suche nach einem Buch, Hörbuch oder Film – du siehst sofort, ob es schon in deiner Liste ist.
 search-no-results = Nichts gefunden.
 search-create-manual = Manuell anlegen
 search-not-found-create = Nicht das Richtige dabei? Manuell anlegen
+search-no-provider = Für diesen Typ ist keine externe Quelle eingerichtet (für Filme wird ein TMDB-API-Key benötigt). Treffer aus der eigenen Bibliothek werden trotzdem angezeigt, oder du legst den Eintrag manuell an.
 search-provider-error = Die externen Quellen sind gerade nicht erreichbar. Treffer aus der eigenen Bibliothek werden trotzdem angezeigt.
 
 ## Liste
 list-title = Meine Liste
-list-empty = Hier ist noch nichts. Such ein Buch oder Hörbuch und füge es hinzu.
+list-empty = Hier ist noch nichts. Such ein Buch, Hörbuch oder einen Film und füge es hinzu.
 list-go-search = Zur Suche
 list-count = { $count ->
     [one] { $count } Eintrag
@@ -74,6 +80,16 @@ label-subtitle = Untertitel
 label-authors = Autor(en)
 label-narrators = Sprecher
 label-narrated-by = gelesen von
+label-cast = Darsteller
+label-starring = mit
+label-directors = Regie
+label-directed-by = Regie:
+label-original-title = Originaltitel
+label-movie-series = Filmreihe
+label-part = Teil
+label-studio = Studio
+label-done-year = Jahr
+year-unknown = unbekannt
 label-series = Serie
 label-volume = Band
 label-year = Erscheinungsjahr
@@ -98,10 +114,11 @@ confirm-delete = Dieses Medium für alle Benutzer löschen? Das kann nicht rück
 ## Formular
 form-title-new = Medium manuell anlegen
 form-title-edit = Medium bearbeiten
-form-intro = Nichts gefunden? Hier kannst du ein Buch oder Hörbuch selbst erfassen.
+form-intro = Nichts gefunden? Hier kannst du ein Buch, Hörbuch oder einen Film selbst erfassen.
 form-names-hint = Mehrere durch Komma trennen
 form-remove-cover = Cover entfernen
-form-error-type = Bitte Buch oder Hörbuch auswählen.
+form-error-type = Bitte Buch, Hörbuch oder Film auswählen.
+form-error-done-year = Bitte ein gültiges Jahr angeben (oder leer lassen).
 form-error-title = Bitte einen Titel angeben.
 form-error-isbn = Die ISBN muss 10 oder 13 Stellen haben.
 form-error-asin = Die ASIN muss genau 10 Zeichen (Buchstaben/Ziffern) haben.
@@ -114,10 +131,13 @@ stats-books-read = Bücher gelesen
 stats-audiobooks-heard = Hörbücher gehört
 stats-books-wanted = Bücher auf der Wunschliste
 stats-audiobooks-wanted = Hörbücher auf der Wunschliste
+stats-movies-seen = Filme gesehen
+stats-movies-wanted = Filme auf der Wunschliste
+stats-no-year = ohne Jahr
 stats-per-year = Pro Jahr
 stats-year = Jahr
-stats-empty = Noch nichts gelesen oder gehört.
-stats-hint = Gezählt wird das Jahr, in dem der Status auf „Gelesen“ bzw. „Gehört“ gesetzt wurde.
+stats-empty = Noch nichts gelesen, gehört oder gesehen.
+stats-hint = Gezählt wird das Jahr, das beim Status „Gelesen“, „Gehört“ oder „Gesehen“ hinterlegt ist. Es wird beim Setzen des Status vorbelegt und lässt sich auf der Detailseite ändern.
 
 ## Verwaltung
 admin-title = Verwaltung
@@ -141,6 +161,9 @@ login-error-expired = Die Anmeldung hat zu lange gedauert. Bitte erneut versuche
 login-error-not-allowed = Dein Konto ist für die Medienliste nicht freigeschaltet. Bitte wende dich an den Administrator.
 logged-out-title = Abgemeldet
 logged-out-text = Du wurdest von der Medienliste abgemeldet.
+
+## Quellen-Hinweise
+tmdb-attribution = Filmdaten und Poster von TMDB. Dieses Produkt nutzt die TMDB-API, ist aber nicht von TMDB unterstützt oder zertifiziert.
 
 ## Fehler
 error-notfound-title = Nicht gefunden

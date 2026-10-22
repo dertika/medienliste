@@ -8,6 +8,7 @@
       <option value="">{{ ctx.t("filter-all") }}</option>
       <option value="book"{% if typ == "book" %} selected{% endif %}>📖 {{ ctx.t("type-books") }}</option>
       <option value="audiobook"{% if typ == "audiobook" %} selected{% endif %}>🎧 {{ ctx.t("type-audiobooks") }}</option>
+      <option value="movie"{% if typ == "movie" %} selected{% endif %}>🎬 {{ ctx.t("type-movies") }}</option>
     </select>
   </label>
   <label><span>{{ ctx.t("filter-status") }}</span>
@@ -42,14 +43,14 @@
   <li class="entry {{ it.type_class }}">
     <a href="{{ ctx.base }}medium/{{ it.media_id }}">
       <span class="entry-cover">
-        {% if let Some(c) = it.cover %}<img src="{{ c }}" alt="" loading="lazy">{% else %}<span class="entry-ph"><svg class="icon" aria-hidden="true"><use href="{{ ctx.base }}static/icons/sprite.svg?v={{ ctx.version }}#{% if it.type_class == "book" %}book{% else %}headphones{% endif %}"></use></svg></span>{% endif %}
+        {% if let Some(c) = it.cover %}<img src="{{ c }}" alt="" loading="lazy">{% else %}<span class="entry-ph"><svg class="icon" aria-hidden="true"><use href="{{ ctx.base }}static/icons/sprite.svg?v={{ ctx.version }}#{{ it.icon_id }}"></use></svg></span>{% endif %}
       </span>
       <span class="entry-info">
         <span class="entry-title">{{ it.title }}</span>
         {% if !it.series.is_empty() %}<span class="entry-series">{{ it.series }}</span>{% endif %}
         {% if !it.authors.is_empty() %}<span class="entry-author">{{ it.authors }}</span>{% endif %}
         <span class="entry-meta">
-          <span class="type-badge {{ it.type_class }}"><svg class="icon" aria-hidden="true"><use href="{{ ctx.base }}static/icons/sprite.svg?v={{ ctx.version }}#{% if it.type_class == "book" %}book{% else %}headphones{% endif %}"></use></svg> {{ it.type_label }}</span>
+          <span class="type-badge {{ it.type_class }}"><svg class="icon" aria-hidden="true"><use href="{{ ctx.base }}static/icons/sprite.svg?v={{ ctx.version }}#{{ it.icon_id }}"></use></svg> {{ it.type_label }}</span>
           {% if !it.year.is_empty() %}<span class="entry-year">{{ it.year }}</span>{% endif %}
           <span class="entry-status {{ it.status_class }}" title="{{ it.status_text }}">{% if it.status_class == "done" %}✓{% else %}☆{% endif %}<span class="sr-only"> {{ it.status_text }}</span></span>
         </span>

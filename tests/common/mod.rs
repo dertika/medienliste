@@ -8,6 +8,7 @@ use async_trait::async_trait;
 use axum::Router;
 use axum::body::Body;
 use axum::http::{HeaderMap, Request, StatusCode, header};
+use http_body_util::BodyExt;
 use medienliste::auth::{self, hash_token};
 use medienliste::config::Config;
 use medienliste::covers::CoverStore;
@@ -15,7 +16,6 @@ use medienliste::models::{MediaType, NewMedia};
 use medienliste::providers::{Provider, Registry};
 use medienliste::web::{self, AppState};
 use medienliste::{db, repo};
-use http_body_util::BodyExt;
 use sqlx::SqlitePool;
 use tower::ServiceExt;
 
@@ -46,6 +46,7 @@ impl Provider for StubProvider {
         match self.kind {
             MediaType::Book => "stubbook",
             MediaType::Audiobook => "stubaudio",
+            MediaType::Movie => "stubmovie",
         }
     }
     fn media_type(&self) -> MediaType {
@@ -67,6 +68,18 @@ pub fn book_hit(title: &str, id: &str, isbn13: &str) -> NewMedia {
         authors: vec!["Testautor".into()],
         isbn13: Some(isbn13.into()),
         source: "stubbook".into(),
+        external_id: Some(id.into()),
+        ..Default::default()
+    }
+}
+
+pub fn movie_hit(title: &str, id: &str) -> NewMedia {
+    NewMedia {
+        media_type: Some(MediaType::Movie),
+        title: title.into(),
+        authors: vec!["Testregie".into()],
+        narrators: vec!["Testdarstellerin".into()],
+        source: "stubmovie".into(),
         external_id: Some(id.into()),
         ..Default::default()
     }
@@ -116,6 +129,7 @@ pub fn default_providers() -> Vec<Arc<dyn Provider>> {
             kind: MediaType::Audiobook,
             hits: vec![audio_hit("Der Schwarm", "B004V0L2VG")],
         }),
+        Arc::new(StubProvider { kind: MediaType::Movie, hits: vec![movie_hit("Lola rennt", "104")] }),
     ]
 }
 

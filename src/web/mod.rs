@@ -56,6 +56,7 @@ pub fn router(state: AppState) -> Router {
         .route("/medium/{id}", get(pages::detail))
         .route("/medium/{id}/status", post(pages::set_status))
         .route("/medium/{id}/entfernen", post(pages::remove_entry))
+        .route("/medium/{id}/jahr", post(pages::set_year))
         .route("/medium/{id}/bearbeiten", get(pages::edit_form).post(pages::edit_save))
         .route("/medium/{id}/loeschen", post(pages::delete_media))
         .route("/neu", get(pages::new_form).post(pages::new_save))

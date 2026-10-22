@@ -3,9 +3,9 @@
 mod common;
 
 use axum::http::{StatusCode, header};
+use common::*;
 use medienliste::models::{MediaType, NewMedia, Status};
 use medienliste::repo::entries;
-use common::*;
 
 /// A hat „Der Schwarm“ gelesen, B möchte „Momo“ lesen.
 async fn setup() -> (Harness, TestUser, TestUser, i64, i64) {
@@ -14,8 +14,8 @@ async fn setup() -> (Harness, TestUser, TestUser, i64, i64) {
     let b = h.user("user-b", false).await;
     let schwarm = h.media(&book_hit("Der Schwarm", "b1", "9783596164530"), Some(a.id)).await;
     let momo = h.media(&book_hit("Momo", "b3", "9783522202107"), Some(b.id)).await;
-    entries::set_status(&h.pool, a.id, schwarm, Status::Done).await.unwrap();
-    entries::set_status(&h.pool, b.id, momo, Status::Wanted).await.unwrap();
+    entries::set_status(&h.pool, a.id, schwarm, Status::Done, 2024).await.unwrap();
+    entries::set_status(&h.pool, b.id, momo, Status::Wanted, 2024).await.unwrap();
     (h, a, b, schwarm, momo)
 }
 

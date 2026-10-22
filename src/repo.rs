@@ -454,6 +454,7 @@ pub mod entries {
         status: String,
         status_changed_at: DateTime<Utc>,
         added_at: DateTime<Utc>,
+        done_year: Option<i32>,
     }
 
     impl From<EntryRow> for Entry {
@@ -462,13 +463,14 @@ pub mod entries {
                 status: Status::parse(&r.status).unwrap_or(Status::Wanted),
                 status_changed_at: r.status_changed_at,
                 added_at: r.added_at,
+                done_year: r.done_year,
             }
         }
     }
 
     pub async fn get(pool: &SqlitePool, user_id: i64, media_id: i64) -> DbResult<Option<Entry>> {
         let r: Option<EntryRow> = sqlx::query_as(
-            "SELECT status, status_changed_at, added_at FROM user_media
+            "SELECT status, status_changed_at, added_at, done_year FROM user_media
              WHERE user_id = ?1 AND media_id = ?2",
         )
         .bind(user_id)
@@ -478,24 +480,56 @@ pub mod entries {
         Ok(r.map(Into::into))
     }
 
-    /// Setzt den Status. Das Änderungsdatum wird nur aktualisiert, wenn sich der Status ändert.
-    pub async fn set_status(pool: &SqlitePool, user_id: i64, media_id: i64, status: Status) -> DbResult<()> {
+    /// Setzt den Status. Änderungsdatum und Jahr werden nur aktualisiert, wenn sich der
+    /// Status ändert: Beim Wechsel auf „done“ wird `current_year` als Jahr vorbelegt,
+    /// bei „wanted“ wird das Jahr entfernt.
+    pub async fn set_status(
+        pool: &SqlitePool,
+        user_id: i64,
+        media_id: i64,
+        status: Status,
+        current_year: i32,
+    ) -> DbResult<()> {
+        let year = (status == Status::Done).then_some(current_year);
         sqlx::query(
-            "INSERT INTO user_media (user_id, media_id, status, status_changed_at, added_at)
-             VALUES (?1, ?2, ?3, ?4, ?4)
+            "INSERT INTO user_media (user_id, media_id, status, status_changed_at, added_at, done_year)
+             VALUES (?1, ?2, ?3, ?4, ?4, ?5)
              ON CONFLICT(user_id, media_id) DO UPDATE SET
                 status_changed_at = CASE WHEN user_media.status = excluded.status
                                          THEN user_media.status_changed_at
                                          ELSE excluded.status_changed_at END,
+                done_year = CASE WHEN user_media.status = excluded.status
+                                 THEN user_media.done_year
+                                 ELSE excluded.done_year END,
                 status = excluded.status",
         )
         .bind(user_id)
         .bind(media_id)
         .bind(status.as_str())
         .bind(now())
+        .bind(year)
         .execute(pool)
         .await?;
         Ok(())
+    }
+
+    /// Ändert das Jahr eines eigenen, abgeschlossenen Eintrags. `false`, wenn es keinen gibt.
+    pub async fn set_done_year(
+        pool: &SqlitePool,
+        user_id: i64,
+        media_id: i64,
+        year: Option<i32>,
+    ) -> DbResult<bool> {
+        let r = sqlx::query(
+            "UPDATE user_media SET done_year = ?3
+             WHERE user_id = ?1 AND media_id = ?2 AND status = 'done'",
+        )
+        .bind(user_id)
+        .bind(media_id)
+        .bind(year)
+        .execute(pool)
+        .await?;
+        Ok(r.rows_affected() > 0)
     }
 
     pub async fn remove(pool: &SqlitePool, user_id: i64, media_id: i64) -> DbResult<bool> {
@@ -605,7 +639,7 @@ pub mod entries {
 
         let sql = format!(
             "SELECT {cols}, um.status AS e_status, um.status_changed_at AS e_changed,
-                    um.added_at AS e_added
+                    um.added_at AS e_added, um.done_year AS e_year
              FROM user_media um JOIN media m ON m.id = um.media_id
              WHERE {where_sql} ORDER BY {order} LIMIT ? OFFSET ?",
             cols = media::COLUMNS,
@@ -626,6 +660,7 @@ pub mod entries {
                     .unwrap_or(Status::Wanted),
                 status_changed_at: row.try_get("e_changed")?,
                 added_at: row.try_get("e_added")?,
+                done_year: row.try_get("e_year")?,
             };
             out.push((m.into(), e));
         }
@@ -645,12 +680,13 @@ pub mod entries {
     }
 
     /// Alle Einträge (für Statistik) als (Typ, Status, Änderungsdatum).
+    /// Alle Einträge (für Statistik) als (Typ, Status, Jahr).
     pub async fn all_for_stats(
         pool: &SqlitePool,
         user_id: i64,
-    ) -> DbResult<Vec<(MediaType, Status, DateTime<Utc>)>> {
-        let rows: Vec<(String, String, DateTime<Utc>)> = sqlx::query_as(
-            "SELECT m.media_type, um.status, um.status_changed_at
+    ) -> DbResult<Vec<(MediaType, Status, Option<i32>)>> {
+        let rows: Vec<(String, String, Option<i32>)> = sqlx::query_as(
+            "SELECT m.media_type, um.status, um.done_year
              FROM user_media um JOIN media m ON m.id = um.media_id
              WHERE um.user_id = ?1",
         )
@@ -659,40 +695,36 @@ pub mod entries {
         .await?;
         Ok(rows
             .into_iter()
-            .filter_map(|(t, s, d)| Some((MediaType::parse(&t)?, Status::parse(&s)?, d)))
+            .filter_map(|(t, s, y)| Some((MediaType::parse(&t)?, Status::parse(&s)?, y)))
             .collect())
     }
 
-    /// Statistik: abgeschlossene Bücher/Hörbücher pro Jahr (lokale Zeitzone) und offene Wünsche.
+    /// Zähler pro Medientyp, Reihenfolge wie [`MediaType::ALL`].
+    pub type PerType = [i64; MediaType::ALL.len()];
+
+    /// Statistik: abgeschlossene Medien pro Jahr (nach dem hinterlegten Jahr) und offene Wünsche.
     #[derive(Debug, Default, Clone, PartialEq, Eq)]
     pub struct Stats {
-        /// Jahr → (Bücher gelesen, Hörbücher gehört), absteigend sortiert.
-        pub per_year: Vec<(i32, i64, i64)>,
-        pub done_books: i64,
-        pub done_audiobooks: i64,
-        pub wanted_books: i64,
-        pub wanted_audiobooks: i64,
+        /// Jahr → Anzahl pro Typ, absteigend sortiert; `None` = ohne Jahr (am Ende).
+        pub per_year: Vec<(Option<i32>, PerType)>,
+        pub done: PerType,
+        pub wanted: PerType,
     }
 
-    pub async fn stats(pool: &SqlitePool, user_id: i64, tz: chrono_tz::Tz) -> DbResult<Stats> {
-        use chrono::Datelike;
-        let mut per_year: BTreeMap<i32, (i64, i64)> = BTreeMap::new();
+    pub async fn stats(pool: &SqlitePool, user_id: i64) -> DbResult<Stats> {
+        let mut per_year: BTreeMap<std::cmp::Reverse<Option<i32>>, PerType> = BTreeMap::new();
         let mut s = Stats::default();
-        for (t, st, d) in all_for_stats(pool, user_id).await? {
-            match (st, t) {
-                (Status::Done, MediaType::Book) => {
-                    s.done_books += 1;
-                    per_year.entry(d.with_timezone(&tz).year()).or_default().0 += 1;
+        for (t, st, year) in all_for_stats(pool, user_id).await? {
+            match st {
+                Status::Done => {
+                    s.done[t.index()] += 1;
+                    per_year.entry(std::cmp::Reverse(year)).or_default()[t.index()] += 1;
                 }
-                (Status::Done, MediaType::Audiobook) => {
-                    s.done_audiobooks += 1;
-                    per_year.entry(d.with_timezone(&tz).year()).or_default().1 += 1;
-                }
-                (Status::Wanted, MediaType::Book) => s.wanted_books += 1,
-                (Status::Wanted, MediaType::Audiobook) => s.wanted_audiobooks += 1,
+                Status::Wanted => s.wanted[t.index()] += 1,
             }
         }
-        s.per_year = per_year.into_iter().rev().map(|(y, (b, a))| (y, b, a)).collect();
+        // Reverse sortiert Some(Jahr) absteigend und None (kleinster Wert) ans Ende.
+        s.per_year = per_year.into_iter().map(|(y, c)| (y.0, c)).collect();
         Ok(s)
     }
 }
