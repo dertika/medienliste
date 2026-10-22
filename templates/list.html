@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}{{ ctx.t("nav-list") }}{% endblock %}
+{% block content %}
+<h1>{{ ctx.t("list-title") }}</h1>
+<form class="filters" method="get" action="{{ ctx.base }}liste" data-autosubmit>
+  <label><span>{{ ctx.t("filter-type") }}</span>
+    <select name="typ">
+      <option value="">{{ ctx.t("filter-all") }}</option>
+      <option value="book"{% if typ == "book" %} selected{% endif %}>📖 {{ ctx.t("type-books") }}</option>
+      <option value="audiobook"{% if typ == "audiobook" %} selected{% endif %}>🎧 {{ ctx.t("type-audiobooks") }}</option>
+    </select>
+  </label>
+  <label><span>{{ ctx.t("filter-status") }}</span>
+    <select name="status">
+      <option value="">{{ ctx.t("filter-all") }}</option>
+      <option value="done"{% if status == "done" %} selected{% endif %}>✓ {{ ctx.t("status-done") }}</option>
+      <option value="wanted"{% if status == "wanted" %} selected{% endif %}>☆ {{ ctx.t("status-wanted") }}</option>
+    </select>
+  </label>
+  <label><span>{{ ctx.t("filter-sort") }}</span>
+    <select name="sort">
+      <option value="changed"{% if sort == "changed" %} selected{% endif %}>{{ ctx.t("sort-changed") }}</option>
+      <option value="added"{% if sort == "added" %} selected{% endif %}>{{ ctx.t("sort-added") }}</option>
+      <option value="title"{% if sort == "title" %} selected{% endif %}>{{ ctx.t("sort-title") }}</option>
+      <option value="author"{% if sort == "author" %} selected{% endif %}>{{ ctx.t("sort-author") }}</option>
+    </select>
+  </label>
+  <label class="grow"><span>{{ ctx.t("filter-text") }}</span>
+    <input type="search" name="q" value="{{ q }}" placeholder="{{ ctx.t("filter-text-placeholder") }}" enterkeyhint="search">
+  </label>
+  <button type="submit" class="btn">{{ ctx.t("filter-apply") }}</button>
+</form>
+<p class="count">{{ count_text }}</p>
+{% if items.is_empty() %}
+<div class="empty">
+  <p>{{ ctx.t("list-empty") }}</p>
+  <a class="btn primary" href="{{ ctx.base }}suche">{{ ctx.t("list-go-search") }}</a>
+</div>
+{% else %}
+<ul class="entries">
+  {% for it in items %}
+  <li class="entry {{ it.type_class }}">
+    <a href="{{ ctx.base }}medium/{{ it.media_id }}">
+      <span class="entry-cover">
+        {% if let Some(c) = it.cover %}<img src="{{ c }}" alt="" loading="lazy">{% else %}<span class="entry-ph"><svg class="icon" aria-hidden="true"><use href="{{ ctx.base }}static/icons/sprite.svg?v={{ ctx.version }}#{% if it.type_class == "book" %}book{% else %}headphones{% endif %}"></use></svg></span>{% endif %}
+      </span>
+      <span class="entry-info">
+        <span class="entry-title">{{ it.title }}</span>
+        {% if !it.series.is_empty() %}<span class="entry-series">{{ it.series }}</span>{% endif %}
+        {% if !it.authors.is_empty() %}<span class="entry-author">{{ it.authors }}</span>{% endif %}
+        <span class="entry-meta">
+          <span class="type-badge {{ it.type_class }}"><svg class="icon" aria-hidden="true"><use href="{{ ctx.base }}static/icons/sprite.svg?v={{ ctx.version }}#{% if it.type_class == "book" %}book{% else %}headphones{% endif %}"></use></svg> {{ it.type_label }}</span>
+          {% if !it.year.is_empty() %}<span class="entry-year">{{ it.year }}</span>{% endif %}
+          <span class="entry-status {{ it.status_class }}" title="{{ it.status_text }}">{% if it.status_class == "done" %}✓{% else %}☆{% endif %}<span class="sr-only"> {{ it.status_text }}</span></span>
+        </span>
+      </span>
+    </a>
+  </li>
+  {% endfor %}
+</ul>
+{% if pages > 1 %}
+<nav class="pager">
+  {% if !prev_url.is_empty() %}<a class="btn" href="{{ prev_url }}">‹ {{ ctx.t("pager-prev") }}</a>{% endif %}
+  <span>{{ page }} / {{ pages }}</span>
+  {% if !next_url.is_empty() %}<a class="btn" href="{{ next_url }}">{{ ctx.t("pager-next") }} ›</a>{% endif %}
+</nav>
+{% endif %}
+{% endif %}
+{% endblock %}

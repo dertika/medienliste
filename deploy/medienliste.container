@@ -1,0 +1,45 @@
+# Quadlet-Unit für rootless Podman.
+# Ablage: ~/.config/containers/systemd/medienliste.container
+# Danach: systemctl --user daemon-reload && systemctl --user start medienliste
+# Damit der Dienst ohne Login startet: loginctl enable-linger <benutzer>
+
+[Unit]
+Description=Medienliste – Bücher, Hörbücher und Filme
+Wants=network-online.target
+After=network-online.target
+
+[Container]
+ContainerName=medienliste
+# <github-benutzer> durch den Besitzer des Repositories ersetzen.
+Image=ghcr.io/<github-benutzer>/medienliste:latest
+# Automatische Updates mit `podman auto-update` (bzw. podman-auto-update.timer).
+AutoUpdate=registry
+
+# Nur lokal veröffentlichen; OpenResty leitet https://medienliste.example.org hierher weiter.
+PublishPort=127.0.0.1:8080:8080
+
+# Datenverzeichnis (SQLite, Cover, Backups) als Bind-Mount.
+# Der Container läuft als UID/GID 65532; keep-id bildet deinen Host-Benutzer darauf ab,
+# sodass die Dateien auf dem Host dir gehören.
+Volume=%h/medienliste/data:/data:Z
+UserNS=keep-id:uid=65532,gid=65532
+
+# Konfiguration (siehe medienliste.env.example), Datei mit chmod 600 schützen.
+EnvironmentFile=%h/.config/medienliste/medienliste.env
+
+# Härtung
+ReadOnly=true
+NoNewPrivileges=true
+DropCapability=ALL
+
+HealthCmd=/usr/local/bin/medienliste healthcheck
+HealthInterval=30s
+HealthStartPeriod=10s
+HealthRetries=3
+
+[Service]
+Restart=always
+TimeoutStartSec=300
+
+[Install]
+WantedBy=default.target

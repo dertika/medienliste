@@ -1,0 +1,18 @@
+<div id="results">
+  {% if !warning.is_empty() %}<p class="notice warn">{{ warning }}</p>{% endif %}
+  {% if searched %}
+    {% if cards.is_empty() %}
+    <div class="empty">
+      <p>{{ ctx.t("search-no-results") }}</p>
+      <a class="btn" href="{{ ctx.base }}neu?titel={{ q|urlencode }}">{{ ctx.t("search-create-manual") }}</a>
+    </div>
+    {% else %}
+    <ul class="cards">
+      {% for card in cards %}{% include "_card.html" %}{% endfor %}
+    </ul>
+    <p class="hint"><a href="{{ ctx.base }}neu?titel={{ q|urlencode }}">{{ ctx.t("search-not-found-create") }}</a></p>
+    {% endif %}
+  {% else %}
+    <p class="hint center">{{ ctx.t("search-intro") }}</p>
+  {% endif %}
+</div>

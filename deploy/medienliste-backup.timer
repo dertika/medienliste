@@ -1,0 +1,9 @@
+[Unit]
+Description=Medienliste – tägliches SQLite-Backup
+
+[Timer]
+OnCalendar=*-*-* 03:15:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

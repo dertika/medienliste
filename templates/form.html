@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}{% if is_edit %}{{ ctx.t("form-title-edit") }}{% else %}{{ ctx.t("form-title-new") }}{% endif %}{% endblock %}
+{% block content %}
+<h1>{% if is_edit %}{{ ctx.t("form-title-edit") }}{% else %}{{ ctx.t("form-title-new") }}{% endif %}</h1>
+{% if !is_edit %}<p class="hint">{{ ctx.t("form-intro") }}</p>{% endif %}
+{% if !error.is_empty() %}<p class="notice error" role="alert">{{ error }}</p>{% endif %}
+<form class="media-form" method="post" action="{{ action }}" enctype="multipart/form-data" data-type-form>
+  <input type="hidden" name="csrf" value="{{ ctx.csrf }}">
+  <fieldset class="type-toggle">
+    <legend>{{ ctx.t("filter-type") }}</legend>
+    <label class="book"><input type="radio" name="media_type" value="book"{% if f.media_type == "book" %} checked{% endif %}><span>📖 {{ ctx.t("type-book") }}</span></label>
+    <label class="audiobook"><input type="radio" name="media_type" value="audiobook"{% if f.media_type == "audiobook" %} checked{% endif %}><span>🎧 {{ ctx.t("type-audiobook") }}</span></label>
+  </fieldset>
+  <label>{{ ctx.t("label-title") }} *<input name="title" value="{{ f.title }}" required maxlength="500"></label>
+  <label>{{ ctx.t("label-subtitle") }}<input name="subtitle" value="{{ f.subtitle }}" maxlength="500"></label>
+  <label>{{ ctx.t("label-authors") }}<input name="authors" value="{{ f.authors }}" placeholder="{{ ctx.t("form-names-hint") }}"></label>
+  <label class="only-audiobook">{{ ctx.t("label-narrators") }}<input name="narrators" value="{{ f.narrators }}" placeholder="{{ ctx.t("form-names-hint") }}"></label>
+  <div class="row">
+    <label>{{ ctx.t("label-series") }}<input name="series" value="{{ f.series }}" maxlength="300"></label>
+    <label class="narrow">{{ ctx.t("label-volume") }}<input name="series_index" value="{{ f.series_index }}" maxlength="20" inputmode="decimal"></label>
+  </div>
+  <div class="row">
+    <label>ISBN<input name="isbn" value="{{ f.isbn }}" inputmode="numeric" maxlength="20"></label>
+    <label class="only-audiobook">ASIN<input name="asin" value="{{ f.asin }}" maxlength="10" autocapitalize="characters"></label>
+  </div>
+  <div class="row">
+    <label class="narrow">{{ ctx.t("label-year") }}<input name="year" value="{{ f.year }}" inputmode="numeric" maxlength="4"></label>
+    <label>{{ ctx.t("label-publisher") }}<input name="publisher" value="{{ f.publisher }}" maxlength="300"></label>
+    <label class="narrow">{{ ctx.t("label-language") }}<input name="language" value="{{ f.language }}" maxlength="20" placeholder="de"></label>
+  </div>
+  <label>{{ ctx.t("label-description") }}<textarea name="description" rows="6" maxlength="20000">{{ f.description }}</textarea></label>
+  <label>{{ ctx.t("label-cover") }}<input type="file" name="cover" accept="image/jpeg,image/png,image/webp,image/gif"></label>
+  {% if has_cover %}<label class="check"><input type="checkbox" name="remove_cover" value="1"> {{ ctx.t("form-remove-cover") }}</label>{% endif %}
+  {% if !is_edit %}
+  <fieldset class="status-choice">
+    <legend>{{ ctx.t("filter-status") }}</legend>
+    <label><input type="radio" name="status" value="done"{% if f.status == "done" %} checked{% endif %}> ✓ {{ ctx.t("status-done") }}</label>
+    <label><input type="radio" name="status" value="wanted"{% if f.status != "done" %} checked{% endif %}> ☆ {{ ctx.t("status-wanted") }}</label>
+  </fieldset>
+  {% endif %}
+  <div class="actions">
+    <button type="submit" class="btn primary">{{ ctx.t("action-save") }}</button>
+  </div>
+</form>
+{% endblock %}

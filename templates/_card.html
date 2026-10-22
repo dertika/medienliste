@@ -1,0 +1,15 @@
+<li class="card {{ card.type_class }}{% if card.status.status.is_some() %} owned{% endif %}">
+  {% if let Some(id) = card.media_id %}<a class="cover" href="{{ ctx.base }}medium/{{ id }}">{% else %}<span class="cover">{% endif %}
+    {% if let Some(c) = card.cover %}<img src="{{ c }}" alt="" loading="lazy" referrerpolicy="no-referrer">{% else %}<span class="cover-ph" aria-hidden="true">{{ card.type_icon }}</span>{% endif %}
+  {% if card.media_id.is_some() %}</a>{% else %}</span>{% endif %}
+  <div class="info">
+    <span class="type-badge {{ card.type_class }}">{{ card.type_icon }} {{ card.type_label }}</span>
+    <h3>{% if let Some(id) = card.media_id %}<a href="{{ ctx.base }}medium/{{ id }}">{{ card.title }}</a>{% else %}{{ card.title }}{% endif %}</h3>
+    {% if !card.subtitle.is_empty() %}<p class="subtitle">{{ card.subtitle }}</p>{% endif %}
+    {% if !card.authors.is_empty() %}<p class="authors">{{ card.authors }}</p>{% endif %}
+    {% if !card.narrators.is_empty() %}<p class="narrators">{{ ctx.t("label-narrated-by") }} {{ card.narrators }}</p>{% endif %}
+    <p class="meta">{% if !card.series.is_empty() %}<span>{{ card.series }}</span>{% endif %}{% if !card.year.is_empty() %}<span>{{ card.year }}</span>{% endif %}<span>{{ card.source_label }}</span></p>
+    {% let s = card.status.clone() %}
+    {% include "_status.html" %}
+  </div>
+</li>

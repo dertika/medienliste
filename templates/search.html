@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}{{ ctx.t("nav-search") }}{% endblock %}
+{% block content %}
+<form class="search" method="get" action="{{ ctx.base }}suche" hx-get="{{ ctx.base }}suche" hx-target="#results" hx-swap="outerHTML" hx-push-url="true" hx-trigger="submit, change from:.type-toggle" hx-indicator=".search .spinner">
+  <div class="type-toggle" role="radiogroup" aria-label="{{ ctx.t("filter-type") }}">
+    <label class="book"><input type="radio" name="typ" value="book"{% if typ == "book" %} checked{% endif %}><span>📖 {{ ctx.t("type-books") }}</span></label>
+    <label class="audiobook"><input type="radio" name="typ" value="audiobook"{% if typ == "audiobook" %} checked{% endif %}><span>🎧 {{ ctx.t("type-audiobooks") }}</span></label>
+  </div>
+  <div class="search-row">
+    <input id="q" type="search" name="q" value="{{ q }}" placeholder="{{ ctx.t("search-placeholder") }}" autocomplete="off" enterkeyhint="search"{% if q.is_empty() %} autofocus{% endif %}>
+    <button type="submit" class="btn primary">{{ ctx.t("search-button") }}</button>
+  </div>
+  <p class="spinner htmx-indicator" role="status">{{ ctx.t("search-loading") }}</p>
+</form>
+{% include "_results.html" %}
+{% endblock %}

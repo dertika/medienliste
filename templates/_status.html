@@ -1,0 +1,30 @@
+<div class="status-controls">
+  {% if let Some(st) = s.status %}
+  <p class="badge badge-{{ st }}">{% if s.is("done") %}✓{% else %}☆{% endif %} {{ s.status_text }} <span class="date">{{ ctx.t("status-since") }} {{ s.status_date }}</span></p>
+  {% else %}
+  <p class="badge badge-none">{{ ctx.t("status-not-in-list") }}</p>
+  {% endif %}
+  {% if let Some(id) = s.media_id %}
+  <form method="post" action="{{ ctx.base }}medium/{{ id }}/status" hx-post="{{ ctx.base }}medium/{{ id }}/status" hx-target="closest .status-controls" hx-swap="outerHTML" class="status-form">
+  {% else %}
+  <form method="post" action="{{ ctx.base }}suche/hinzufuegen" hx-post="{{ ctx.base }}suche/hinzufuegen" hx-target="closest .status-controls" hx-swap="outerHTML" class="status-form">
+    <input type="hidden" name="source" value="{{ s.source }}">
+    <input type="hidden" name="external_id" value="{{ s.external_id }}">
+  {% endif %}
+    <input type="hidden" name="csrf" value="{{ ctx.csrf }}">
+    <input type="hidden" name="return_to" value="{{ s.return_to }}">
+    {% if s.show_remove %}<input type="hidden" name="show_remove" value="1">{% endif %}
+    <button type="submit" name="status" value="done" class="btn-status done{% if s.is("done") %} on{% endif %}" aria-pressed="{{ s.is("done") }}">✓ {{ s.label_done }}</button>
+    <button type="submit" name="status" value="wanted" class="btn-status wanted{% if s.is("wanted") %} on{% endif %}" aria-pressed="{{ s.is("wanted") }}">☆ {{ s.label_wanted }}</button>
+  </form>
+  {% if s.show_remove && s.status.is_some() %}
+  {% if let Some(id) = s.media_id %}
+  <form method="post" action="{{ ctx.base }}medium/{{ id }}/entfernen" hx-post="{{ ctx.base }}medium/{{ id }}/entfernen" hx-target="closest .status-controls" hx-swap="outerHTML" hx-confirm="{{ ctx.t("confirm-remove") }}" class="remove-form">
+    <input type="hidden" name="csrf" value="{{ ctx.csrf }}">
+    <input type="hidden" name="return_to" value="{{ s.return_to }}">
+    <input type="hidden" name="show_remove" value="1">
+    <button type="submit" class="link danger">{{ ctx.t("action-remove") }}</button>
+  </form>
+  {% endif %}
+  {% endif %}
+</div>

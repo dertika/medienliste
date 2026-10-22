@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}{{ ctx.t("nav-stats") }}{% endblock %}
+{% block content %}
+<h1>{{ ctx.t("stats-title") }}</h1>
+<div class="tiles">
+  <div class="tile book"><span class="num">{{ s.done_books }}</span><span>📖 {{ ctx.t("stats-books-read") }}</span></div>
+  <div class="tile audiobook"><span class="num">{{ s.done_audiobooks }}</span><span>🎧 {{ ctx.t("stats-audiobooks-heard") }}</span></div>
+  <div class="tile"><span class="num">{{ s.wanted_books }}</span><span>☆ {{ ctx.t("stats-books-wanted") }}</span></div>
+  <div class="tile"><span class="num">{{ s.wanted_audiobooks }}</span><span>☆ {{ ctx.t("stats-audiobooks-wanted") }}</span></div>
+</div>
+<h2>{{ ctx.t("stats-per-year") }}</h2>
+{% if rows.is_empty() %}
+<p class="empty">{{ ctx.t("stats-empty") }}</p>
+{% else %}
+<table class="stats">
+  <thead><tr><th>{{ ctx.t("stats-year") }}</th><th>📖 {{ ctx.t("type-books") }}</th><th>🎧 {{ ctx.t("type-audiobooks") }}</th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+  <tr>
+    <th scope="row"><a href="{{ ctx.base }}liste?status=done&sort=changed">{{ r.year }}</a></th>
+    <td><span class="bar book" style="width: {{ r.books_pct }}%"></span><span class="val">{{ r.books }}</span></td>
+    <td><span class="bar audiobook" style="width: {{ r.audiobooks_pct }}%"></span><span class="val">{{ r.audiobooks }}</span></td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+<p class="hint">{{ ctx.t("stats-hint") }}</p>
+{% endif %}
+{% endblock %}
