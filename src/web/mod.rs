@@ -47,6 +47,26 @@ impl FromRef<AppState> for AuthState {
 #[folder = "static/"]
 struct Assets;
 
+/// Prüfsumme über alle statischen Dateien. Sie wird an CSS/JS/Icon-URLs angehängt
+/// (`?v=…`), damit Browser und Service Worker nach einem Update nie veraltete
+/// Dateien verwenden, auch wenn sich die App-Version nicht ändert.
+pub fn asset_version() -> &'static str {
+    static VERSION: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| {
+        use sha2::{Digest, Sha256};
+        let mut names: Vec<_> = Assets::iter().collect();
+        names.sort();
+        let mut h = Sha256::new();
+        for n in names {
+            h.update(n.as_bytes());
+            if let Some(f) = Assets::get(&n) {
+                h.update(f.data);
+            }
+        }
+        hex::encode(h.finalize())[..12].to_string()
+    });
+    &VERSION
+}
+
 pub fn router(state: AppState) -> Router {
     let app = Router::new()
         .route("/", get(pages::home))
@@ -142,7 +162,7 @@ fn error_page(status: StatusCode, title_key: &str, message_key: &str) -> Respons
         user: None,
         csrf: String::new(),
         nav: "",
-        version: env!("CARGO_PKG_VERSION"),
+        version: asset_version(),
         tz: chrono_tz::Europe::Berlin,
     };
     let page = ErrorPage { title: ctx.t(title_key), message: ctx.t(message_key), ctx };
