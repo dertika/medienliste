@@ -31,7 +31,7 @@ impl Ctx {
             user: cu.map(|c| c.user.clone()),
             csrf: cu.map(|c| c.csrf.clone()).unwrap_or_default(),
             nav,
-            version: env!("CARGO_PKG_VERSION"),
+            version: crate::web::asset_version(),
             tz: st.cfg.timezone,
         }
     }
@@ -77,6 +77,11 @@ impl Ctx {
     /// Bezeichnung des Feldes `narrators`: Sprecher bzw. Darsteller.
     pub fn narrators_label(&self, t: MediaType) -> String {
         self.t(if t.is_movie() { "label-cast" } else { "label-narrators" })
+    }
+
+    /// „Band“ bzw. bei Filmen „Teil“.
+    pub fn volume_label(&self, t: MediaType) -> String {
+        self.t(if t.is_movie() { "label-part" } else { "label-volume" })
     }
 
     pub fn status_label(&self, s: Status, t: MediaType) -> String {
@@ -195,9 +200,9 @@ pub struct ListItem {
 impl ListItem {
     pub fn new(ctx: &Ctx, m: &Media, e: &Entry) -> Self {
         let series = match (&m.series, &m.series_index) {
-            (Some(s), Some(i)) => format!("{s} · {} {i}", ctx.t("label-volume")),
+            (Some(s), Some(i)) => format!("{s} · {} {i}", ctx.volume_label(m.media_type)),
             (Some(s), None) => s.clone(),
-            (None, Some(i)) => format!("{} {i}", ctx.t("label-volume")),
+            (None, Some(i)) => format!("{} {i}", ctx.volume_label(m.media_type)),
             (None, None) => String::new(),
         };
         ListItem {

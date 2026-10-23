@@ -1,7 +1,7 @@
 // Service Worker der Medienliste.
 // Persönliche Seiten werden bewusst NICHT gecacht (Datenschutz, Aktualität);
 // nur statische Dateien werden für schnelleres Laden vorgehalten.
-const CACHE = "medienliste-static-v1";
+const CACHE = "medienliste-static-v2";
 
 self.addEventListener("install", () => self.skipWaiting());
 
@@ -23,7 +23,14 @@ self.addEventListener("fetch", (event) => {
       const hit = await cache.match(req);
       if (hit) return hit;
       const resp = await fetch(req);
-      if (resp.ok) cache.put(req, resp.clone());
+      if (resp.ok) {
+        // Ältere Fassungen derselben Datei (anderes ?v=…) entfernen.
+        for (const old of await cache.keys()) {
+          const u = new URL(old.url);
+          if (u.pathname === url.pathname && u.search !== url.search) await cache.delete(old);
+        }
+        cache.put(req, resp.clone());
+      }
       return resp;
     })
   );

@@ -189,3 +189,29 @@ async fn movie_search_without_provider_shows_hint() {
     assert!(body.contains("keine externe Quelle"));
     assert!(body.contains("Manuell anlegen"));
 }
+
+#[tokio::test]
+async fn movie_series_uses_part_and_assets_are_versioned() {
+    let h = harness().await;
+    let a = h.user("user-a", false).await;
+    let mut m = movie_hit("Die Gefährten", "120");
+    m.series = Some("Der Herr der Ringe".into());
+    m.series_index = Some("1".into());
+    let id = h.media(&m, Some(a.id)).await;
+    medienliste::repo::entries::set_status(&h.pool, a.id, id, medienliste::models::Status::Wanted, 2026)
+        .await
+        .unwrap();
+
+    let (_, _, body) = h.get("/liste", Some(&a)).await;
+    assert!(body.contains("Der Herr der Ringe · Teil 1"), "{body}");
+    assert!(!body.contains("Band 1"));
+    let (_, _, body) = h.get(&format!("/medium/{id}"), Some(&a)).await;
+    assert!(body.contains("Filmreihe"));
+    assert!(body.contains("· Teil 1"));
+
+    // CSS/JS-URLs tragen eine Inhalts-Prüfsumme, nicht nur die App-Version.
+    let v = medienliste::web::asset_version();
+    assert_eq!(v.len(), 12);
+    assert!(v.chars().all(|c| c.is_ascii_hexdigit()));
+    assert!(body.contains(&format!("static/app.css?v={v}")));
+}
