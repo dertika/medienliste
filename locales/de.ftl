@@ -161,6 +161,7 @@ login-error-expired = Die Anmeldung hat zu lange gedauert. Bitte erneut versuche
 login-error-not-allowed = Dein Konto ist für die Medienliste nicht freigeschaltet. Bitte wende dich an den Administrator.
 logged-out-title = Abgemeldet
 logged-out-text = Du wurdest von der Medienliste abgemeldet.
+logged-out-idp-hint = Beim Anmeldedienst bist du eventuell noch angemeldet. „Anmelden“ meldet dich dann ohne Passwortabfrage wieder an. Um dich ganz abzumelden, melde dich auch beim Anmeldedienst ab.
 
 ## Quellen-Hinweise
 tmdb-attribution = Filmdaten und Poster von TMDB. Dieses Produkt nutzt die TMDB-API, ist aber nicht von TMDB unterstützt oder zertifiziert.

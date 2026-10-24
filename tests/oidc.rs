@@ -200,11 +200,28 @@ async fn unknown_state_is_rejected() {
 }
 
 #[tokio::test]
+async fn logout_redirects_to_configured_url() {
+    let h = harness_with_config("https://idp.invalid", default_providers(), |c| {
+        c.logout_url = Some("https://example.org/".parse().unwrap());
+    })
+    .await;
+    let a = h.user("user-a", false).await;
+    let (st, headers, _) = h.post("/auth/logout", Some(&a), &[]).await;
+    assert_eq!(st, StatusCode::SEE_OTHER);
+    assert_eq!(headers[header::LOCATION], "https://example.org/");
+    let csp = headers[header::CONTENT_SECURITY_POLICY].to_str().unwrap();
+    assert!(csp.contains("form-action 'self' https://example.org"), "{csp}");
+    assert!(headers[header::SET_COOKIE].to_str().unwrap().contains("Max-Age=0"));
+    assert_eq!(h.get("/liste", Some(&a)).await.0, StatusCode::SEE_OTHER, "Sitzung muss beendet sein");
+}
+
+#[tokio::test]
 async fn logout_deletes_session() {
     let h = harness().await;
     let a = h.user("user-a", false).await;
     let (st, headers, _) = h.post("/auth/logout", Some(&a), &[]).await;
     assert_eq!(st, StatusCode::SEE_OTHER);
+    assert_eq!(headers[header::LOCATION], "/auth/abgemeldet", "ohne Logout-URL eigene Seite");
     assert!(headers[header::SET_COOKIE].to_str().unwrap().contains("Max-Age=0"));
     let (st, _, _) = h.get("/liste", Some(&a)).await;
     assert_eq!(st, StatusCode::SEE_OTHER, "Sitzung muss ungültig sein");
