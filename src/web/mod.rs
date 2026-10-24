@@ -98,11 +98,7 @@ pub fn router(state: AppState) -> Router {
         .layer(RequestBodyLimitLayer::new(8 * 1024 * 1024))
         .layer(SetResponseHeaderLayer::if_not_present(
             header::CONTENT_SECURITY_POLICY,
-            HeaderValue::from_static(
-                "default-src 'self'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline'; \
-                 script-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; \
-                 form-action 'self'",
-            ),
+            content_security_policy(&state.cfg),
         ))
         .layer(SetResponseHeaderLayer::if_not_present(
             header::X_CONTENT_TYPE_OPTIONS,
@@ -116,6 +112,22 @@ pub fn router(state: AppState) -> Router {
 
     let base = state.cfg.base_path().trim_end_matches('/').to_string();
     if base.is_empty() { app } else { Router::new().nest(&base, app) }
+}
+
+/// Content-Security-Policy. `form-action` gilt in Browsern auch für Weiterleitungen nach
+/// einem Formular, daher muss das Ziel der Abmeldung (falls konfiguriert) erlaubt sein.
+fn content_security_policy(cfg: &Config) -> HeaderValue {
+    let mut form_action = String::from("'self'");
+    if let Some(u) = &cfg.logout_url {
+        form_action.push(' ');
+        form_action.push_str(&u.origin().ascii_serialization());
+    }
+    let csp = format!(
+        "default-src 'self'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline'; \
+         script-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; \
+         form-action {form_action}"
+    );
+    HeaderValue::from_str(&csp).expect("gültiger CSP-Header")
 }
 
 // ----- Fehler -----

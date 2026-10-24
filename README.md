@@ -31,6 +31,7 @@ Alle Assets, Templates, Migrationen und Sprachdateien sind in das Binary eingebe
 | `MEDIENLISTE_OIDC_ISSUER` | ja | – | Issuer-URL, z. B. `https://auth.example.org` |
 | `MEDIENLISTE_OIDC_CLIENT_ID` | ja | – | Client-ID aus der Authelia-Konfiguration |
 | `MEDIENLISTE_OIDC_CLIENT_SECRET` | nein | – | Client-Secret (im Klartext). Ohne Secret wird die App als Public Client mit PKCE betrieben. |
+| `MEDIENLISTE_LOGOUT_URL` | nein | – | Ziel nach dem Abmelden, z. B. eine Portalseite mit Authelia-Abmeldung oder direkt `https://auth.example.org/logout?rd=https://example.org`. Ohne Angabe erscheint die eigene Abmeldeseite. Siehe [Abmelden](#abmelden). |
 | `MEDIENLISTE_OIDC_REDIRECT_URL` | nein | `<BASE_URL>/auth/callback` | Redirect-URI, muss in Authelia eingetragen sein |
 | `MEDIENLISTE_OIDC_SCOPES` | nein | `openid profile email groups` | Angefragte Scopes |
 | `MEDIENLISTE_OIDC_ADMIN_GROUP` | nein | – | Mitglieder dieser Authelia-Gruppe erhalten die Admin-Rolle (wird bei jedem Login neu ausgewertet) |
@@ -72,6 +73,15 @@ Client in der Authelia-Konfiguration (`identity_providers.oidc.clients`):
 ```
 
 Name, E-Mail und Gruppen werden aus dem ID-Token bzw. vom Userinfo-Endpoint gelesen. Benutzer werden anhand des `sub`-Claims zugeordnet, Name und E-Mail werden bei jedem Login aktualisiert.
+
+### Abmelden
+
+„Abmelden“ beendet die Sitzung in der Medienliste. Die Anmeldung beim Identity Provider bleibt aber bestehen (Single Sign-on). Wer danach auf „Anmelden“ tippt, ist deshalb ohne Passwortabfrage sofort wieder drin.
+
+Um auch dort abzumelden, setze `MEDIENLISTE_LOGOUT_URL`, zum Beispiel:
+
+- **Portalseite:** `MEDIENLISTE_LOGOUT_URL=https://example.org`. Von dort meldet man sich bei Authelia ab.
+- **Direkt der Authelia-Logout:** `MEDIENLISTE_LOGOUT_URL=https://auth.example.org/logout?rd=https://example.org`. Authelia beendet die Sitzung und leitet zu `rd` weiter. Das Ziel muss in Authelias Session-Domain liegen.
 
 ### Zugang auf eine Gruppe beschränken
 

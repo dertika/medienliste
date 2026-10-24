@@ -134,8 +134,19 @@ pub fn default_providers() -> Vec<Arc<dyn Provider>> {
 }
 
 pub async fn harness_with(issuer: &str, providers: Vec<Arc<dyn Provider>>) -> Harness {
+    harness_with_config(issuer, providers, |_| {}).await
+}
+
+/// Wie [`harness_with`], aber die Konfiguration kann vorher angepasst werden.
+pub async fn harness_with_config(
+    issuer: &str,
+    providers: Vec<Arc<dyn Provider>>,
+    adjust: impl FnOnce(&mut Config),
+) -> Harness {
     let dir = tempfile::tempdir().unwrap();
-    let cfg = Arc::new(config(dir.path(), issuer));
+    let mut cfg = config(dir.path(), issuer);
+    adjust(&mut cfg);
+    let cfg = Arc::new(cfg);
     let pool = db::connect_memory().await.unwrap();
     let state = AppState {
         cfg: cfg.clone(),

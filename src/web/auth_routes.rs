@@ -113,7 +113,12 @@ pub async fn logout(
         repo::sessions::delete(&st.pool, &hash_token(token)).await?;
     }
     let clear = auth::session_cookie(&st.cfg, "", 0);
-    let target = format!("{}auth/abgemeldet", st.cfg.base_path());
+    // Die Sitzung beim Identity Provider (z. B. Authelia) bleibt bestehen; ist eine
+    // Logout-URL konfiguriert, geht es dorthin, sonst auf die eigene Abmeldeseite.
+    let target = match &st.cfg.logout_url {
+        Some(u) => u.to_string(),
+        None => format!("{}auth/abgemeldet", st.cfg.base_path()),
+    };
     Ok(([(header::SET_COOKIE, clear)], Redirect::to(&target)).into_response())
 }
 

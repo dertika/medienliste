@@ -12,6 +12,8 @@ use url::Url;
 pub struct Config {
     pub listen: SocketAddr,
     pub base_url: Url,
+    /// Ziel nach dem Abmelden (z. B. eine Portalseite oder der Logout des Identity Providers).
+    pub logout_url: Option<Url>,
     pub data_dir: PathBuf,
     pub timezone: Tz,
     pub oidc: OidcConfig,
@@ -54,6 +56,17 @@ impl Config {
             let p = format!("{}/", base_url.path());
             base_url.set_path(&p);
         }
+
+        let logout_url = match get("MEDIENLISTE_LOGOUT_URL") {
+            Some(u) => {
+                let u: Url = u.parse().context("MEDIENLISTE_LOGOUT_URL ist keine gültige URL")?;
+                if !matches!(u.scheme(), "https" | "http") {
+                    bail!("MEDIENLISTE_LOGOUT_URL muss mit https:// oder http:// beginnen");
+                }
+                Some(u)
+            }
+            None => None,
+        };
 
         let listen = get("MEDIENLISTE_LISTEN")
             .unwrap_or_else(|| "0.0.0.0:8080".into())
@@ -103,6 +116,7 @@ impl Config {
         Ok(Config {
             listen,
             base_url,
+            logout_url,
             data_dir: get("MEDIENLISTE_DATA_DIR").unwrap_or_else(|| "/data".into()).into(),
             timezone,
             oidc: OidcConfig {
@@ -186,6 +200,22 @@ mod tests {
         assert!(c.secure_cookies());
         assert_eq!(c.oidc.scopes, vec!["openid", "profile", "email", "groups"]);
         assert_eq!(c.backup_interval_hours, 24);
+    }
+
+    #[test]
+    fn logout_url() {
+        let base = [
+            ("MEDIENLISTE_BASE_URL", "https://medien.example.org"),
+            ("MEDIENLISTE_OIDC_ISSUER", "https://auth.example.org"),
+            ("MEDIENLISTE_OIDC_CLIENT_ID", "medienliste"),
+        ];
+        assert!(cfg(&base).unwrap().logout_url.is_none());
+        let mut with = base.to_vec();
+        with.push(("MEDIENLISTE_LOGOUT_URL", "https://example.org"));
+        assert_eq!(cfg(&with).unwrap().logout_url.unwrap().as_str(), "https://example.org/");
+        let mut bad = base.to_vec();
+        bad.push(("MEDIENLISTE_LOGOUT_URL", "javascript:alert(1)"));
+        assert!(cfg(&bad).is_err());
     }
 
     #[test]
