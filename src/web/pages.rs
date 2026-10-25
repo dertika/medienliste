@@ -43,7 +43,7 @@ fn can_edit(cu: &CurrentUser, m: &Media) -> bool {
 }
 
 pub async fn home(State(st): State<AppState>, _cu: CurrentUser) -> Response {
-    Redirect::to(&format!("{}suche", st.cfg.base_path())).into_response()
+    Redirect::to(&format!("{}liste", st.cfg.base_path())).into_response()
 }
 
 // ----- Suche -----

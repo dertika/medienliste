@@ -98,11 +98,15 @@ main { max-width: 960px; margin: 0 auto; padding: 1rem; padding-left: max(1rem, 
 @media (min-width: 760px) {
   body { padding-bottom: 2rem; }
   .tabs { position: static; justify-content: center; gap: .25rem; border-top: 0; border-bottom: 1px solid var(--border); padding: .4rem; background: var(--surface); }
-  .tabs a { flex: 0 0 auto; flex-direction: row; font-size: .92rem; padding: 0; gap: 0; }
-  .tab-icon { width: auto; height: auto; padding: .45rem .5rem .45rem .8rem; border-radius: 999px 0 0 999px; }
+  /* Eine durchgehende Pille pro Reiter (Icon und Text gemeinsam), damit beide Hälften
+     in jedem Browser exakt gleich hoch sind. */
+  .tabs a {
+    flex: 0 0 auto; flex-direction: row; align-items: center; gap: .45rem;
+    font-size: .92rem; line-height: 1.2; padding: .5rem 1rem .5rem .85rem; border-radius: 999px;
+  }
+  .tab-icon { width: auto; height: auto; padding: 0; border-radius: 0; background: none !important; }
   .tab-icon .icon { width: 1.15rem; height: 1.15rem; }
-  .tab-label { padding: .45rem .9rem .45rem .1rem; border-radius: 0 999px 999px 0; }
-  .tabs a.active .tab-label { background: color-mix(in srgb, var(--primary) 15%, transparent); }
+  .tabs a.active { background: color-mix(in srgb, var(--primary) 15%, transparent); }
 }
 .logout-btn {
   display: inline-flex; align-items: center; gap: .35rem; background: none; border: 0; padding: .4rem;

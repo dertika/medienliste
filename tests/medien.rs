@@ -215,3 +215,20 @@ async fn movie_series_uses_part_and_assets_are_versioned() {
     assert!(v.chars().all(|c| c.is_ascii_hexdigit()));
     assert!(body.contains(&format!("static/app.css?v={v}")));
 }
+
+#[tokio::test]
+async fn my_list_is_start_page_and_first_tab() {
+    let h = harness().await;
+    let a = h.user("user-a", false).await;
+    let (st, headers, _) = h.get("/", Some(&a)).await;
+    assert_eq!(st, StatusCode::SEE_OTHER);
+    assert_eq!(headers[header::LOCATION], "/liste");
+
+    let (_, _, body) = h.get("/liste", Some(&a)).await;
+    let list = body.find("href=\"/liste\"><span class=\"tab-icon\"").expect("Reiter Meine Liste");
+    let search = body.find("href=\"/suche\"><span class=\"tab-icon\"").expect("Reiter Suche");
+    assert!(list < search, "Meine Liste steht vor der Suche");
+
+    let (_, _, manifest) = h.get("/manifest.webmanifest", None).await;
+    assert!(manifest.contains("\"start_url\":\"/liste\""));
+}

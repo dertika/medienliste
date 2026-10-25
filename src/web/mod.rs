@@ -332,7 +332,7 @@ async fn manifest(State(st): State<AppState>) -> Response {
         "short_name": i.t(lang, "app-name"),
         "description": i.t(lang, "app-description"),
         "lang": lang,
-        "start_url": format!("{base}suche"),
+        "start_url": format!("{base}liste"),
         "scope": base,
         "display": "standalone",
         "background_color": "#f7f4ee",
