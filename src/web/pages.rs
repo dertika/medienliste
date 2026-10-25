@@ -141,6 +141,9 @@ pub struct AddForm {
     status: String,
     #[serde(default)]
     return_to: String,
+    /// Gesetzt auf der Vorschau-Detailseite: danach zur echten Detailseite.
+    #[serde(default)]
+    show_remove: String,
 }
 
 #[derive(Template)]
@@ -210,6 +213,13 @@ pub async fn add_from_search(
         .ok_or(AppError::NotFound)?;
     let media_id = ensure_media(&st, &hit, cu.id()).await?;
     entries::set_status(&st.pool, cu.id(), media_id, status, current_year(&st)).await?;
+    if !f.show_remove.is_empty() {
+        let target = format!("{}medium/{media_id}", st.cfg.base_path());
+        if is_htmx(&headers) {
+            return Ok(([("hx-redirect", target)], StatusCode::OK).into_response());
+        }
+        return Ok(Redirect::to(&target).into_response());
+    }
     status_response(&st, &cu, &headers, media_id, &f.return_to, false).await
 }
 
@@ -408,6 +418,46 @@ struct DetailPage {
     added: String,
     can_edit: bool,
     can_delete: bool,
+    /// Noch nicht gespeicherter Suchtreffer.
+    preview: bool,
+}
+
+fn paragraphs(description: Option<&str>) -> Vec<String> {
+    description
+        .unwrap_or("")
+        .split("\n\n")
+        .map(str::trim)
+        .filter(|p| !p.is_empty())
+        .map(String::from)
+        .collect()
+}
+
+impl DetailPage {
+    fn new(ctx: Ctx, m: Media, cover: Option<String>, s: StatusView) -> Self {
+        DetailPage {
+            type_label: ctx.type_label(m.media_type),
+            type_icon: type_icon(m.media_type),
+            authors_prefix: ctx.authors_prefix(m.media_type),
+            narrators_label: ctx.narrators_label(m.media_type),
+            volume_label: ctx.volume_label(m.media_type),
+            series_label: ctx.t(if m.media_type.is_movie() { "label-movie-series" } else { "label-series" }),
+            publisher_label: ctx.t(match m.media_type {
+                MediaType::Movie => "label-studio",
+                MediaType::Series => "label-network",
+                _ => "label-publisher",
+            }),
+            source_label: source_label(&ctx, &m.source),
+            paragraphs: paragraphs(m.description.as_deref()),
+            added: String::new(),
+            can_edit: false,
+            can_delete: false,
+            preview: false,
+            cover,
+            s,
+            m,
+            ctx,
+        }
+    }
 }
 
 pub async fn detail(
@@ -420,37 +470,63 @@ pub async fn detail(
     let entry = entries::get(&st.pool, cu.id(), id).await?;
     let mut s = StatusView::new(&ctx, Some(id), m.media_type, entry.as_ref(), &format!("medium/{id}"));
     s.show_remove = true;
-    let paragraphs = m
-        .description
-        .as_deref()
-        .unwrap_or("")
-        .split("\n\n")
-        .map(str::trim)
-        .filter(|p| !p.is_empty())
-        .map(String::from)
-        .collect();
-    Ok(render(&DetailPage {
-        type_label: ctx.type_label(m.media_type),
-        type_icon: type_icon(m.media_type),
-        authors_prefix: ctx.authors_prefix(m.media_type),
-        narrators_label: ctx.narrators_label(m.media_type),
-        volume_label: ctx.volume_label(m.media_type),
-        series_label: ctx.t(if m.media_type.is_movie() { "label-movie-series" } else { "label-series" }),
-        publisher_label: ctx.t(match m.media_type {
-            MediaType::Movie => "label-studio",
-            MediaType::Series => "label-network",
-            _ => "label-publisher",
-        }),
-        cover: cover_url(&ctx, &m.cover_file),
-        source_label: source_label(&ctx, &m.source),
-        added: entry.as_ref().map(|e| ctx.date(&e.added_at)).unwrap_or_default(),
-        can_edit: can_edit(&cu, &m),
-        can_delete: cu.user.is_admin,
-        paragraphs,
-        s,
-        m,
-        ctx,
-    }))
+    let cover = cover_url(&ctx, &m.cover_file);
+    let added = entry.as_ref().map(|e| ctx.date(&e.added_at)).unwrap_or_default();
+    let can_edit = can_edit(&cu, &m);
+    let mut page = DetailPage::new(ctx, m, cover, s);
+    page.added = added;
+    page.can_edit = can_edit;
+    page.can_delete = cu.user.is_admin;
+    Ok(render(&page))
+}
+
+/// Detailseite eines Suchtreffers, ohne ihn zu speichern. Erst beim Setzen
+/// eines Status wird das Medium angelegt.
+pub async fn preview(
+    State(st): State<AppState>,
+    cu: CurrentUser,
+    Path((source, external_id)): Path<(String, String)>,
+) -> Result<Response, AppError> {
+    let hit = st
+        .providers
+        .resolve(&source, &external_id)
+        .await
+        .map_err(AppError::Internal)?
+        .ok_or(AppError::NotFound)?;
+    if let Some(id) = media::find_existing(&st.pool, &hit).await? {
+        return Ok(Redirect::to(&format!("{}medium/{id}", st.cfg.base_path())).into_response());
+    }
+    let ctx = Ctx::new(&st, Some(&cu), "search");
+    let kind = hit.kind();
+    let mut s = StatusView::new(&ctx, None, kind, None, "");
+    s.source = hit.source.clone();
+    s.external_id = hit.external_id.clone().unwrap_or_else(|| external_id.clone());
+    s.show_remove = true;
+    let cover = hit.cover_url.clone().filter(|u| u.starts_with("https://"));
+    let m = Media {
+        id: 0,
+        media_type: kind,
+        title: hit.title,
+        subtitle: hit.subtitle,
+        authors: hit.authors,
+        narrators: hit.narrators,
+        description: hit.description,
+        isbn10: hit.isbn10,
+        isbn13: hit.isbn13,
+        asin: hit.asin,
+        published_year: hit.published_year,
+        series: hit.series,
+        series_index: hit.series_index,
+        language: hit.language,
+        publisher: hit.publisher,
+        cover_file: None,
+        source: hit.source,
+        external_id: hit.external_id,
+        created_by: None,
+    };
+    let mut page = DetailPage::new(ctx, m, cover, s);
+    page.preview = true;
+    Ok(render(&page))
 }
 
 // ----- Manuell anlegen / bearbeiten -----

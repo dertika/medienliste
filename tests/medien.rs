@@ -271,3 +271,54 @@ async fn series_search_add_detail_and_stats() {
     let (_, _, body) = h.get("/statistik", Some(&a)).await;
     assert!(body.contains(r#"<span class="num">1</span><span>📺 Serien gesehen"#), "{body}");
 }
+
+#[tokio::test]
+async fn search_hit_opens_preview_without_saving() {
+    let h = harness().await;
+    let a = h.user("user-a", false).await;
+    let b = h.user("user-b", false).await;
+    let count = |h: &Harness| {
+        let pool = h.pool.clone();
+        async move { sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM media").fetch_one(&pool).await.unwrap() }
+    };
+
+    let (_, _, body) = h.get("/suche?typ=book&q=schwarm", Some(&a)).await;
+    assert!(body.contains(r#"href="/vorschau/stubbook/b1""#), "{body}");
+
+    let (st, _, body) = h.get("/vorschau/stubbook/b1", Some(&a)).await;
+    assert_eq!(st, StatusCode::OK);
+    assert!(body.contains("<h1>Der Schwarm</h1>"));
+    assert!(body.contains("9783596164530"));
+    assert!(body.contains(r#"action="/suche/hinzufuegen""#));
+    assert!(body.contains(r#"name="show_remove" value="1""#));
+    assert!(body.contains("Nicht in deiner Liste"));
+    assert_eq!(count(&h).await, 0, "Vorschau speichert nichts");
+
+    // Status aus der Vorschau setzen → weiter zur echten Detailseite.
+    let (st, headers, _) = h
+        .post_htmx(
+            "/suche/hinzufuegen",
+            &a,
+            &[("source", "stubbook"), ("external_id", "b1"), ("status", "wanted"), ("show_remove", "1")],
+        )
+        .await;
+    assert_eq!(st, StatusCode::OK);
+    let id: i64 = sqlx::query_scalar("SELECT id FROM media WHERE source = 'stubbook'")
+        .fetch_one(&h.pool)
+        .await
+        .unwrap();
+    assert_eq!(headers.get("hx-redirect").unwrap(), &format!("/medium/{id}"));
+
+    // Gespeichert: Vorschau leitet weiter, auch für andere Benutzer (ohne deren Status zu ändern).
+    let (st, headers, _) = h.get("/vorschau/stubbook/b1", Some(&b)).await;
+    assert_eq!(st, StatusCode::SEE_OTHER);
+    assert_eq!(headers.get(header::LOCATION).unwrap(), &format!("/medium/{id}"));
+    assert_eq!(h.entry_status(b.id, id).await, None);
+
+    let (st, _, _) = h.get("/vorschau/unbekannt/b1", Some(&a)).await;
+    assert_eq!(st, StatusCode::NOT_FOUND);
+    let (st, _, _) = h.get("/vorschau/stubbook/gibtsnicht", Some(&a)).await;
+    assert_eq!(st, StatusCode::NOT_FOUND);
+    let (st, _, _) = h.get("/vorschau/stubbook/b1", None).await;
+    assert_ne!(st, StatusCode::OK, "nur angemeldet");
+}

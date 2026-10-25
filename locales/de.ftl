@@ -36,6 +36,7 @@ status-wanted-movie = Möchte ich sehen
 status-wanted-series = Möchte ich sehen
 status-since = seit
 status-not-in-list = Nicht in deiner Liste
+preview-hint = Vorschau aus der Quelle – gespeichert wird erst, wenn du einen Status setzt.
 
 ## Quellen
 source-googlebooks = Google Books

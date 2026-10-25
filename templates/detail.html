@@ -3,7 +3,7 @@
 {% block content %}
 <article class="detail {{ m.media_type.as_str() }}">
   <div class="detail-cover">
-    {% if let Some(c) = cover %}<img src="{{ c }}" alt="{{ ctx.t("label-cover") }}">{% else %}<span class="cover-ph big" aria-hidden="true">{{ type_icon }}</span>{% endif %}
+    {% if let Some(c) = cover %}<img src="{{ c }}" alt="{{ ctx.t("label-cover") }}" referrerpolicy="no-referrer">{% else %}<span class="cover-ph big" aria-hidden="true">{{ type_icon }}</span>{% endif %}
   </div>
   <div class="detail-main">
     <span class="type-badge {{ m.media_type.as_str() }}">{{ type_icon }} {{ type_label }}</span>
@@ -12,6 +12,7 @@
     {% if !m.authors.is_empty() %}<p class="authors">{{ authors_prefix }}{{ m.authors.join(", ") }}</p>{% endif %}
     {% let s = s.clone() %}
     {% include "_status.html" %}
+    {% if preview %}<p class="hint">{{ ctx.t("preview-hint") }}</p>{% endif %}
     {% if !added.is_empty() %}<p class="hint">{{ ctx.t("label-added") }} {{ added }}</p>{% endif %}
     <dl class="facts">
       {% if !m.narrators.is_empty() %}<dt>{{ narrators_label }}</dt><dd>{{ m.narrators.join(", ") }}</dd>{% endif %}
