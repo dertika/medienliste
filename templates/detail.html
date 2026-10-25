@@ -17,7 +17,7 @@
       {% if !m.narrators.is_empty() %}<dt>{{ narrators_label }}</dt><dd>{{ m.narrators.join(", ") }}</dd>{% endif %}
       {% if let Some(se) = m.series %}<dt>{{ series_label }}</dt><dd>{{ se }}{% if let Some(i) = m.series_index %} · {{ volume_label }} {{ i }}{% endif %}</dd>{% endif %}
       {% if let Some(y) = m.published_year %}<dt>{{ ctx.t("label-year") }}</dt><dd>{{ y }}</dd>{% endif %}
-      {% if let Some(p) = m.publisher %}<dt>{{ ctx.t("label-publisher") }}</dt><dd>{{ p }}</dd>{% endif %}
+      {% if let Some(p) = m.publisher %}<dt>{{ publisher_label }}</dt><dd>{{ p }}</dd>{% endif %}
       {% if let Some(l) = m.language %}<dt>{{ ctx.t("label-language") }}</dt><dd>{{ l }}</dd>{% endif %}
       {% if let Some(i) = m.isbn13 %}<dt>ISBN-13</dt><dd>{{ i }}</dd>{% endif %}
       {% if let Some(i) = m.isbn10 %}<dt>ISBN-10</dt><dd>{{ i }}</dd>{% endif %}

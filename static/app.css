@@ -13,6 +13,8 @@
   --audio-soft: #f2e9fa;
   --movie: #c05621;
   --movie-soft: #fdebdc;
+  --series: #0e7c86;
+  --series-soft: #dcf2f3;
   --done: #2f855a;
   --done-soft: #e3f4ea;
   --wanted: #b7791f;
@@ -37,6 +39,8 @@
     --audio-soft: #2c2236;
     --movie: #f0a46b;
     --movie-soft: #3a2618;
+    --series: #5cc8cf;
+    --series-soft: #15313a;
     --done: #68c495;
     --done-soft: #1b3326;
     --wanted: #e6b056;
@@ -133,6 +137,7 @@ main { max-width: 960px; margin: 0 auto; padding: 1rem; padding-left: max(1rem, 
 }
 .entry.audiobook .entry-ph { height: 89px; background: var(--audio-soft); color: var(--audio); }
 .entry.movie .entry-ph { background: var(--movie-soft); color: var(--movie); }
+.entry.series .entry-ph { background: var(--series-soft); color: var(--series); }
 .entry-ph .icon { width: 2rem; height: 2rem; }
 .entry-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .15rem; padding: .15rem 0; overflow: hidden; }
 .entry-title {
@@ -183,6 +188,9 @@ label > input, label > select, label > textarea { margin-top: .25rem; color: var
 .type-toggle .book input:checked + span { border-color: var(--book); background: var(--book-soft); color: var(--book); }
 .type-toggle .audiobook input:checked + span { border-color: var(--audio); background: var(--audio-soft); color: var(--audio); }
 .type-toggle .movie input:checked + span { border-color: var(--movie); background: var(--movie-soft); color: var(--movie); }
+.type-toggle .series input:checked + span { border-color: var(--series); background: var(--series-soft); color: var(--series); }
+/* Vier Typen: auf schmalen Displays 2×2 */
+@media (max-width: 480px) { .type-toggle { flex-wrap: wrap; } .type-toggle label { flex: 1 1 calc(50% - .25rem); } }
 .type-toggle span { font-size: .95rem; padding: 0 .3rem; text-align: center; }
 .type-toggle input:focus-visible + span { outline: 2px solid var(--primary); outline-offset: 2px; }
 
@@ -203,6 +211,7 @@ label > input, label > select, label > textarea { margin-top: .25rem; color: var
 }
 .card.audiobook { border-left-color: var(--audio); }
 .card.movie { border-left-color: var(--movie); }
+.card.series { border-left-color: var(--series); }
 .card.owned { background: linear-gradient(0deg, var(--surface), var(--surface)); }
 .cover { flex: 0 0 72px; display: block; }
 .cover img, .cover-ph { width: 72px; height: 108px; object-fit: cover; border-radius: 6px; background: var(--border); display: flex; align-items: center; justify-content: center; font-size: 2rem; }
@@ -218,6 +227,7 @@ label > input, label > select, label > textarea { margin-top: .25rem; color: var
 }
 .type-badge.audiobook { background: var(--audio-soft); color: var(--audio); }
 .type-badge.movie { background: var(--movie-soft); color: var(--movie); }
+.type-badge.series { background: var(--series-soft); color: var(--series); }
 
 /* Status */
 .status-controls { margin-top: .5rem; }
@@ -273,19 +283,21 @@ label > input, label > select, label > textarea { margin-top: .25rem; color: var
 
 /* Statistik */
 .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
-@media (min-width: 760px) { .tiles { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 760px) { .tiles { grid-template-columns: repeat(4, 1fr); } }
 .tile { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: .6rem .75rem; display: flex; flex-direction: column; gap: .2rem; font-size: .9rem; color: var(--muted); }
 .tile .num { font-size: 1.6rem; font-weight: 700; color: var(--text); }
 .tile.book { border-left: 5px solid var(--book); }
 .tile.audiobook { border-left: 5px solid var(--audio); }
 .tile.movie { border-left: 5px solid var(--movie); }
+.tile.series { border-left: 5px solid var(--series); }
 table { width: 100%; border-collapse: collapse; background: var(--surface); border-radius: var(--radius); overflow: hidden; }
 th, td { text-align: left; padding: .55rem .7rem; border-bottom: 1px solid var(--border); }
-table.stats td { width: 30%; position: relative; white-space: nowrap; }
+table.stats td { width: 22%; position: relative; white-space: nowrap; }
 .bar { display: inline-block; height: .8rem; border-radius: 4px; vertical-align: middle; margin-right: .4rem; min-width: 2px; max-width: calc(100% - 3rem); }
 .bar.book { background: var(--book); }
 .bar.audiobook { background: var(--audio); }
 .bar.movie { background: var(--movie); }
+.bar.series { background: var(--series); }
 .val { font-variant-numeric: tabular-nums; font-weight: 600; }
 .table-wrap { overflow-x: auto; }
 .tag { font-size: .72rem; padding: .05rem .4rem; border-radius: 999px; background: var(--done-soft); color: var(--done); }

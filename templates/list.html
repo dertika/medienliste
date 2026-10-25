@@ -9,6 +9,7 @@
       <option value="book"{% if typ == "book" %} selected{% endif %}>📖 {{ ctx.t("type-books") }}</option>
       <option value="audiobook"{% if typ == "audiobook" %} selected{% endif %}>🎧 {{ ctx.t("type-audiobooks") }}</option>
       <option value="movie"{% if typ == "movie" %} selected{% endif %}>🎬 {{ ctx.t("type-movies") }}</option>
+      <option value="series"{% if typ == "series" %} selected{% endif %}>📺 {{ ctx.t("type-series-plural") }}</option>
     </select>
   </label>
   <label><span>{{ ctx.t("filter-status") }}</span>

@@ -1,6 +1,6 @@
 <li class="card {{ card.type_class }}{% if card.status.status.is_some() %} owned{% endif %}">
   {% if let Some(id) = card.media_id %}<a class="cover" href="{{ ctx.base }}medium/{{ id }}">{% else %}<span class="cover">{% endif %}
-    {% if let Some(c) = card.cover %}<img src="{{ c }}" alt="" loading="lazy" referrerpolicy="no-referrer">{% else %}<span class="cover-ph" aria-hidden="true">{{ card.type_icon }}</span>{% endif %}
+    {% if let Some(c) = card.cover %}<img src="{{ c }}" alt="" loading="lazy" referrerpolicy="no-referrer" data-fallback="{{ card.type_icon }}">{% else %}<span class="cover-ph" aria-hidden="true">{{ card.type_icon }}</span>{% endif %}
   {% if card.media_id.is_some() %}</a>{% else %}</span>{% endif %}
   <div class="info">
     <span class="type-badge {{ card.type_class }}">{{ card.type_icon }} {{ card.type_label }}</span>

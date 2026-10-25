@@ -61,22 +61,27 @@ impl Ctx {
             MediaType::Book => "type-book",
             MediaType::Audiobook => "type-audiobook",
             MediaType::Movie => "type-movie",
+            MediaType::Series => "type-series",
         })
     }
 
     /// Vorsatz vor der Urheber-Zeile auf der Detailseite (bei Filmen „Regie:“).
     pub fn authors_prefix(&self, t: MediaType) -> String {
-        if t.is_movie() { format!("{} ", self.t("label-directed-by")) } else { String::new() }
+        match t {
+            MediaType::Movie => format!("{} ", self.t("label-directed-by")),
+            MediaType::Series => format!("{} ", self.t("label-created-by")),
+            _ => String::new(),
+        }
     }
 
     /// Vorsatz vor Sprecher bzw. Darstellern in Karten.
     pub fn narrators_prefix(&self, t: MediaType) -> String {
-        self.t(if t.is_movie() { "label-starring" } else { "label-narrated-by" })
+        self.t(if t.is_screen() { "label-starring" } else { "label-narrated-by" })
     }
 
     /// Bezeichnung des Feldes `narrators`: Sprecher bzw. Darsteller.
     pub fn narrators_label(&self, t: MediaType) -> String {
-        self.t(if t.is_movie() { "label-cast" } else { "label-narrators" })
+        self.t(if t.is_screen() { "label-cast" } else { "label-narrators" })
     }
 
     /// „Band“ bzw. bei Filmen „Teil“.
@@ -239,6 +244,7 @@ fn type_class(t: MediaType) -> &'static str {
         MediaType::Book => "book",
         MediaType::Audiobook => "audiobook",
         MediaType::Movie => "movie",
+        MediaType::Series => "series",
     }
 }
 
@@ -248,6 +254,7 @@ pub fn icon_id(t: MediaType) -> &'static str {
         MediaType::Book => "book",
         MediaType::Audiobook => "headphones",
         MediaType::Movie => "film",
+        MediaType::Series => "tv",
     }
 }
 
@@ -256,6 +263,7 @@ pub fn type_icon(t: MediaType) -> &'static str {
         MediaType::Book => "📖",
         MediaType::Audiobook => "🎧",
         MediaType::Movie => "🎬",
+        MediaType::Series => "📺",
     }
 }
 
@@ -268,7 +276,7 @@ pub fn source_label(ctx: &Ctx, source: &str) -> String {
         "googlebooks" => "source-googlebooks",
         "openlibrary" => "source-openlibrary",
         "audible" => "source-audible",
-        "tmdb" => "source-tmdb",
+        "tmdb" | "tmdbtv" => "source-tmdb",
         "manual" => "source-manual",
         _ => "source-other",
     })

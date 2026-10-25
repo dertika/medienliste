@@ -124,7 +124,7 @@ pub async fn search(
         cards.sort_by_key(|c| c.status.status.is_none());
     }
 
-    let attribution = kind.is_movie() && st.providers.provider("tmdb").is_some();
+    let attribution = kind.is_screen() && st.providers.all().any(|p| p.id().starts_with("tmdb"));
     if is_htmx(&headers) {
         return Ok(render(&SearchResults { ctx, q, cards, searched: true, warning, attribution }));
     }
@@ -400,6 +400,7 @@ struct DetailPage {
     narrators_label: String,
     volume_label: String,
     series_label: String,
+    publisher_label: String,
     cover: Option<String>,
     source_label: String,
     paragraphs: Vec<String>,
@@ -435,6 +436,11 @@ pub async fn detail(
         narrators_label: ctx.narrators_label(m.media_type),
         volume_label: ctx.volume_label(m.media_type),
         series_label: ctx.t(if m.media_type.is_movie() { "label-movie-series" } else { "label-series" }),
+        publisher_label: ctx.t(match m.media_type {
+            MediaType::Movie => "label-studio",
+            MediaType::Series => "label-network",
+            _ => "label-publisher",
+        }),
         cover: cover_url(&ctx, &m.cover_file),
         source_label: source_label(&ctx, &m.source),
         added: entry.as_ref().map(|e| ctx.date(&e.added_at)).unwrap_or_default(),
@@ -522,7 +528,7 @@ impl FormValues {
         let kind = MediaType::parse(&self.media_type).ok_or("form-error-type")?;
         let title = opt(&self.title, 500).ok_or("form-error-title")?;
         let (mut isbn10, mut isbn13) = (None, None);
-        if !kind.is_movie() && !self.isbn.trim().is_empty() {
+        if !kind.is_screen() && !self.isbn.trim().is_empty() {
             let i = clean_isbn(&self.isbn).ok_or("form-error-isbn")?;
             if i.len() == 10 {
                 isbn13 = isbn10_to_13(&i);
@@ -833,8 +839,16 @@ pub async fn stats(State(st): State<AppState>, cu: CurrentUser) -> Result<Respon
         .collect();
     let mut tiles = Vec::new();
     for (counts, keys, wanted) in [
-        (&s.done, ["stats-books-read", "stats-audiobooks-heard", "stats-movies-seen"], false),
-        (&s.wanted, ["stats-books-wanted", "stats-audiobooks-wanted", "stats-movies-wanted"], true),
+        (
+            &s.done,
+            ["stats-books-read", "stats-audiobooks-heard", "stats-movies-seen", "stats-series-seen"],
+            false,
+        ),
+        (
+            &s.wanted,
+            ["stats-books-wanted", "stats-audiobooks-wanted", "stats-movies-wanted", "stats-series-wanted"],
+            true,
+        ),
     ] {
         for t in types {
             tiles.push(StatTile {
@@ -852,6 +866,7 @@ pub async fn stats(State(st): State<AppState>, cu: CurrentUser) -> Result<Respon
                 MediaType::Book => "type-books",
                 MediaType::Audiobook => "type-audiobooks",
                 MediaType::Movie => "type-movies",
+                MediaType::Series => "type-series-plural",
             }),
             icon: type_icon(*t),
         })

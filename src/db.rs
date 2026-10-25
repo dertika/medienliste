@@ -108,3 +108,75 @@ mod tests {
         assert!(n >= 1);
     }
 }
+
+#[cfg(test)]
+mod migration_tests {
+    use super::*;
+
+    /// 0002 baut `media` neu auf; bestehende Medien und persönliche Einträge müssen erhalten bleiben.
+    #[tokio::test]
+    async fn series_migration_keeps_data() {
+        let dir = tempfile::tempdir().unwrap();
+        let pool = connect(&dir.path().join("m.sqlite3")).await.unwrap();
+        // Nur die erste Migration anwenden (Stand vor Serien).
+        let mut only_first = sqlx::migrate::Migrator::new(std::path::Path::new(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/migrations"
+        )))
+        .await
+        .unwrap();
+        only_first.migrations = std::borrow::Cow::Owned(vec![MIGRATOR.migrations[0].clone()]);
+        only_first.run(&pool).await.unwrap();
+
+        let now = "2026-01-01T00:00:00+00:00";
+        sqlx::query("INSERT INTO users (id, sub, created_at, last_login_at) VALUES (1, 's', ?1, ?1)")
+            .bind(now)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO media (id, media_type, title, source, created_at, updated_at)
+             VALUES (7, 'movie', 'Lola rennt', 'manual', ?1, ?1)",
+        )
+        .bind(now)
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO user_media (user_id, media_id, status, status_changed_at, added_at, done_year)
+             VALUES (1, 7, 'done', ?1, ?1, 2019)",
+        )
+        .bind(now)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        migrate(&pool).await.unwrap();
+
+        let (title, year): (String, i64) = sqlx::query_as(
+            "SELECT m.title, um.done_year FROM user_media um JOIN media m ON m.id = um.media_id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!((title.as_str(), year), ("Lola rennt", 2019));
+        // Neuer Typ erlaubt, Fremdschlüssel wieder aktiv und konsistent.
+        sqlx::query(
+            "INSERT INTO media (media_type, title, source, created_at, updated_at)
+             VALUES ('series', 'Dark', 'manual', ?1, ?1)",
+        )
+        .bind(now)
+        .execute(&pool)
+        .await
+        .unwrap();
+        let fk: i64 = sqlx::query_scalar("PRAGMA foreign_keys").fetch_one(&pool).await.unwrap();
+        assert_eq!(fk, 1);
+        let violations: Vec<(String,)> =
+            sqlx::query_as("PRAGMA foreign_key_check").fetch_all(&pool).await.unwrap();
+        assert!(violations.is_empty());
+        // Löschen kaskadiert weiterhin.
+        sqlx::query("DELETE FROM media WHERE id = 7").execute(&pool).await.unwrap();
+        let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM user_media").fetch_one(&pool).await.unwrap();
+        assert_eq!(n, 0);
+    }
+}

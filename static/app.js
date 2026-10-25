@@ -31,6 +31,17 @@
     form.addEventListener("change", function () { syncTypeForm(form); });
   });
 
+  // Fehlende Cover (z. B. kein Bild bei Open Library) durch den Platzhalter ersetzen.
+  document.addEventListener("error", function (e) {
+    var img = e.target;
+    if (!img || img.tagName !== "IMG" || !img.hasAttribute("data-fallback")) return;
+    var ph = document.createElement("span");
+    ph.className = "cover-ph";
+    ph.setAttribute("aria-hidden", "true");
+    ph.textContent = img.getAttribute("data-fallback");
+    img.replaceWith(ph);
+  }, true);
+
   // Service Worker für die PWA (nur statische Dateien werden gecacht).
   var script = document.getElementById("app-js");
   if ("serviceWorker" in navigator && script) {

@@ -232,3 +232,42 @@ async fn my_list_is_start_page_and_first_tab() {
     let (_, _, manifest) = h.get("/manifest.webmanifest", None).await;
     assert!(manifest.contains("\"start_url\":\"/liste\""));
 }
+
+#[tokio::test]
+async fn series_search_add_detail_and_stats() {
+    let h = harness().await;
+    let a = h.user("user-a", false).await;
+
+    let (_, _, body) = h.get("/suche?typ=series&q=dark", Some(&a)).await;
+    assert!(body.contains("Dark"));
+    assert!(body.contains("Möchte ich sehen"));
+    assert!(body.contains("mit Testdarsteller"));
+    assert!(body.contains("value=\"series\" checked"));
+
+    let (st, _, _) = h
+        .post_htmx(
+            "/suche/hinzufuegen",
+            &a,
+            &[("source", "stubseries"), ("external_id", "70523"), ("status", "done")],
+        )
+        .await;
+    assert_eq!(st, StatusCode::OK);
+    let id: i64 = sqlx::query_scalar("SELECT id FROM media WHERE source = 'stubseries'")
+        .fetch_one(&h.pool)
+        .await
+        .unwrap();
+    assert_eq!(done_year(&h, a.id, id).await, Some(this_year()));
+
+    let (_, _, body) = h.get(&format!("/medium/{id}"), Some(&a)).await;
+    assert!(body.contains("Idee: Testidee"));
+    assert!(body.contains("<dt>Sender</dt><dd>Testsender</dd>"));
+    assert!(body.contains("Darsteller"));
+    assert!(body.contains("Gesehen"));
+
+    let (_, _, body) = h.get("/liste?typ=series", Some(&a)).await;
+    assert!(body.contains("Dark"));
+    assert!(body.contains("entry series"));
+
+    let (_, _, body) = h.get("/statistik", Some(&a)).await;
+    assert!(body.contains(r#"<span class="num">1</span><span>📺 Serien gesehen"#), "{body}");
+}

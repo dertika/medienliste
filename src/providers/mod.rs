@@ -5,6 +5,7 @@
 //! gefragt; der erste mit Treffern gewinnt (spätere dienen als Fallback).
 
 pub mod audible;
+pub mod dnb;
 pub mod googlebooks;
 pub mod openlibrary;
 pub mod tmdb;
@@ -70,16 +71,25 @@ impl Registry {
     }
 
     pub fn from_config(cfg: &Config, http: reqwest::Client) -> Self {
-        let mut providers: Vec<Arc<dyn Provider>> = vec![
-            Arc::new(googlebooks::GoogleBooks::new(http.clone(), cfg.google_books_api_key.clone())),
-            Arc::new(openlibrary::OpenLibrary::new(http.clone())),
-            Arc::new(audible::Audible::new(http.clone(), &cfg.audible_marketplace)),
-        ];
+        let mut providers: Vec<Arc<dyn Provider>> = Vec::new();
+        // Bücher: Google Books nur mit API-Key (das anonyme Kontingent ist meist erschöpft),
+        // dann die Deutsche Nationalbibliothek, zuletzt Open Library.
+        if let Some(key) = &cfg.google_books_api_key {
+            providers.push(Arc::new(googlebooks::GoogleBooks::new(http.clone(), Some(key.clone()))));
+        }
+        providers.push(Arc::new(dnb::Dnb::new(http.clone())));
+        providers.push(Arc::new(openlibrary::OpenLibrary::new(http.clone())));
+        providers.push(Arc::new(audible::Audible::new(http.clone(), &cfg.audible_marketplace)));
         // Filme nur mit API-Key (TMDb erlaubt keine anonyme Suche).
         if let Some(key) = &cfg.tmdb_api_key {
-            providers.push(Arc::new(tmdb::Tmdb::new(http, key.clone())));
+            providers.push(Arc::new(tmdb::Tmdb::new(http.clone(), key.clone())));
+            providers.push(Arc::new(tmdb::TmdbTv::new(http.clone(), key.clone())));
         }
         Self::new(providers)
+    }
+
+    pub fn all(&self) -> impl Iterator<Item = &Arc<dyn Provider>> {
+        self.providers.iter()
     }
 
     pub fn provider(&self, id: &str) -> Option<&Arc<dyn Provider>> {
@@ -252,6 +262,33 @@ mod tests {
         async fn fetch(&self, _: &str) -> Result<Option<NewMedia>> {
             anyhow::bail!("sollte aus dem Cache kommen")
         }
+    }
+
+    fn ids(cfg: &Config) -> Vec<&'static str> {
+        Registry::from_config(cfg, reqwest::Client::new()).all().map(|p| p.id()).collect()
+    }
+
+    #[test]
+    fn provider_order_depends_on_keys() {
+        let base = |extra: &[(&str, &str)]| {
+            let mut m: HashMap<String, String> = [
+                ("MEDIENLISTE_BASE_URL", "https://m.example.org"),
+                ("MEDIENLISTE_OIDC_ISSUER", "https://auth.example.org"),
+                ("MEDIENLISTE_OIDC_CLIENT_ID", "m"),
+            ]
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
+            m.extend(extra.iter().map(|(k, v)| (k.to_string(), v.to_string())));
+            Config::from_lookup(|k| m.get(k).cloned()).unwrap()
+        };
+        // Ohne Keys: DNB zuerst, kein Google, keine Filme/Serien.
+        assert_eq!(ids(&base(&[])), vec!["dnb", "openlibrary", "audible"]);
+        // Mit Keys: Google vor DNB, TMDB für Filme und Serien.
+        assert_eq!(
+            ids(&base(&[("MEDIENLISTE_GOOGLE_BOOKS_API_KEY", "g"), ("MEDIENLISTE_TMDB_API_KEY", "t")])),
+            vec!["googlebooks", "dnb", "openlibrary", "audible", "tmdb", "tmdbtv"]
+        );
     }
 
     #[tokio::test]

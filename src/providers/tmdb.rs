@@ -168,6 +168,124 @@ impl Provider for Tmdb {
     }
 }
 
+// ----- Serien -----
+
+/// TV-Serien über dieselbe TMDB-API (gleicher Key).
+pub struct TmdbTv {
+    api: Tmdb,
+}
+
+impl TmdbTv {
+    pub fn new(http: reqwest::Client, api_key: String) -> Self {
+        Self { api: Tmdb::new(http, api_key) }
+    }
+
+    pub fn with_base_urls(http: reqwest::Client, api_key: String, base_url: &str, image_base: &str) -> Self {
+        Self { api: Tmdb::with_base_urls(http, api_key, base_url, image_base) }
+    }
+
+    fn convert(&self, s: Show) -> Option<NewMedia> {
+        let title = non_empty(s.name).or_else(|| non_empty(s.original_name.clone()))?;
+        let original = non_empty(s.original_name).filter(|o| *o != title);
+        let cast = s
+            .aggregate_credits
+            .map(|c| c.cast.into_iter().take(6).map(|p| p.name).collect())
+            .unwrap_or_default();
+        Some(NewMedia {
+            media_type: Some(MediaType::Series),
+            title,
+            subtitle: original,
+            authors: s.created_by.into_iter().map(|p| p.name).collect(),
+            narrators: cast,
+            description: non_empty(s.overview),
+            published_year: s.first_air_date.as_deref().and_then(parse_year),
+            language: non_empty(s.original_language),
+            publisher: s.networks.into_iter().next().map(|n| n.name),
+            cover_url: self.api.poster(&s.poster_path),
+            source: "tmdbtv".into(),
+            external_id: Some(s.id.to_string()),
+            ..Default::default()
+        })
+    }
+}
+
+#[derive(Deserialize)]
+struct ShowSearch {
+    #[serde(default)]
+    results: Vec<Show>,
+}
+
+#[derive(Deserialize)]
+struct Show {
+    id: i64,
+    name: Option<String>,
+    original_name: Option<String>,
+    first_air_date: Option<String>,
+    overview: Option<String>,
+    poster_path: Option<String>,
+    original_language: Option<String>,
+    #[serde(default)]
+    created_by: Vec<Named>,
+    #[serde(default)]
+    networks: Vec<Named>,
+    aggregate_credits: Option<AggregateCredits>,
+}
+
+#[derive(Deserialize)]
+struct AggregateCredits {
+    #[serde(default)]
+    cast: Vec<Named>,
+}
+
+#[async_trait]
+impl Provider for TmdbTv {
+    fn id(&self) -> &'static str {
+        "tmdbtv"
+    }
+
+    fn media_type(&self) -> MediaType {
+        MediaType::Series
+    }
+
+    fn fetch_on_add(&self) -> bool {
+        // Die Suche liefert weder Macher noch Sender oder Besetzung.
+        true
+    }
+
+    async fn search(&self, query: &str, limit: usize) -> Result<Vec<NewMedia>> {
+        let resp = self
+            .api
+            .get("/search/tv")
+            .query(&[("query", query), ("language", "de-DE"), ("include_adult", "false")])
+            .send()
+            .await?;
+        if !resp.status().is_success() {
+            bail!("TMDb antwortet mit {}", resp.status());
+        }
+        let r: ShowSearch = resp.json().await?;
+        Ok(r.results.into_iter().take(limit).filter_map(|s| self.convert(s)).collect())
+    }
+
+    async fn fetch(&self, external_id: &str) -> Result<Option<NewMedia>> {
+        if external_id.is_empty() || !external_id.chars().all(|c| c.is_ascii_digit()) {
+            return Ok(None);
+        }
+        let resp = self
+            .api
+            .get(&format!("/tv/{external_id}"))
+            .query(&[("language", "de-DE"), ("append_to_response", "aggregate_credits")])
+            .send()
+            .await?;
+        if resp.status() == reqwest::StatusCode::NOT_FOUND {
+            return Ok(None);
+        }
+        if !resp.status().is_success() {
+            bail!("TMDb antwortet mit {}", resp.status());
+        }
+        Ok(self.convert(resp.json().await?))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -239,5 +357,45 @@ mod tests {
         Mock::given(method("GET")).respond_with(ResponseTemplate::new(401)).mount(&server).await;
         let t = Tmdb::with_base_urls(reqwest::Client::new(), "falsch".into(), &server.uri(), "https://img");
         assert!(t.search("x", 5).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn tv_search_and_fetch() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/search/tv"))
+            .and(query_param("query", "Dark"))
+            .and(query_param("language", "de-DE"))
+            .respond_with(ResponseTemplate::new(200).set_body_raw(
+                r#"{"results":[{"id":70523,"name":"Dark","original_name":"Dark","first_air_date":"2017-12-01",
+                    "overview":"Kinder verschwinden.","poster_path":"/dark.jpg","original_language":"de"}]}"#,
+                "application/json",
+            ))
+            .mount(&server)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/tv/70523"))
+            .and(query_param("append_to_response", "aggregate_credits"))
+            .respond_with(ResponseTemplate::new(200).set_body_raw(
+                r#"{"id":70523,"name":"Dark","original_name":"Dark","first_air_date":"2017-12-01",
+                    "created_by":[{"name":"Baran bo Odar"},{"name":"Jantje Friese"}],
+                    "networks":[{"name":"Netflix"}],
+                    "aggregate_credits":{"cast":[{"name":"Louis Hofmann"},{"name":"Lisa Vicari"}]}}"#,
+                "application/json",
+            ))
+            .mount(&server)
+            .await;
+        let t = TmdbTv::with_base_urls(reqwest::Client::new(), "k".into(), &server.uri(), "https://img");
+        let hits = t.search("Dark", 10).await.unwrap();
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].media_type, Some(MediaType::Series));
+        assert_eq!(hits[0].published_year, Some(2017));
+        assert_eq!(hits[0].cover_url.as_deref(), Some("https://img/w500/dark.jpg"));
+        assert_eq!(hits[0].source, "tmdbtv");
+        let m = t.fetch("70523").await.unwrap().unwrap();
+        assert_eq!(m.authors, vec!["Baran bo Odar", "Jantje Friese"]);
+        assert_eq!(m.narrators, vec!["Louis Hofmann", "Lisa Vicari"]);
+        assert_eq!(m.publisher.as_deref(), Some("Netflix"));
+        assert!(t.fetch("x1").await.unwrap().is_none());
     }
 }
