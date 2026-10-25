@@ -2,7 +2,7 @@
 # Weitere Sprachen: Datei kopieren (z. B. en.ftl), übersetzen und in src/i18n.rs eintragen.
 
 app-name = Medienliste
-app-description = Bücher, Hörbücher und Filme im Blick: gelesen, gehört, gesehen oder auf der Wunschliste.
+app-description = Bücher, Hörbücher, Filme und Serien im Blick: gelesen, gehört, gesehen oder auf der Wunschliste.
 
 ## Navigation
 nav-label = Hauptnavigation
@@ -17,9 +17,11 @@ nav-logout = Abmelden
 type-book = Buch
 type-audiobook = Hörbuch
 type-movie = Film
+type-series = Serie
 type-books = Bücher
 type-audiobooks = Hörbücher
 type-movies = Filme
+type-series-plural = Serien
 
 ## Status
 status-done = Gelesen/Gehört/Gesehen
@@ -27,9 +29,11 @@ status-wanted = Möchte ich lesen/hören/sehen
 status-done-book = Gelesen
 status-done-audiobook = Gehört
 status-done-movie = Gesehen
+status-done-series = Gesehen
 status-wanted-book = Möchte ich lesen
 status-wanted-audiobook = Möchte ich hören
 status-wanted-movie = Möchte ich sehen
+status-wanted-series = Möchte ich sehen
 status-since = seit
 status-not-in-list = Nicht in deiner Liste
 
@@ -38,23 +42,24 @@ source-googlebooks = Google Books
 source-openlibrary = Open Library
 source-audible = Audible
 source-tmdb = TMDB
+source-dnb = Deutsche Nationalbibliothek
 source-manual = Manuell angelegt
 source-other = Andere Quelle
 
 ## Suche
-search-placeholder = Titel, Autor, Regie, ISBN oder ASIN
+search-placeholder = Titel, Autor, Regie, ISBN …
 search-button = Suchen
 search-loading = Suche läuft …
-search-intro = Suche nach einem Buch, Hörbuch oder Film – du siehst sofort, ob es schon in deiner Liste ist.
+search-intro = Suche nach einem Buch, Hörbuch, Film oder einer Serie – du siehst sofort, ob es schon in deiner Liste ist.
 search-no-results = Nichts gefunden.
 search-create-manual = Manuell anlegen
 search-not-found-create = Nicht das Richtige dabei? Manuell anlegen
-search-no-provider = Für diesen Typ ist keine externe Quelle eingerichtet (für Filme wird ein TMDB-API-Key benötigt). Treffer aus der eigenen Bibliothek werden trotzdem angezeigt, oder du legst den Eintrag manuell an.
+search-no-provider = Für diesen Typ ist keine externe Quelle eingerichtet (für Filme und Serien wird ein TMDB-API-Key benötigt). Treffer aus der eigenen Bibliothek werden trotzdem angezeigt, oder du legst den Eintrag manuell an.
 search-provider-error = Die externen Quellen sind gerade nicht erreichbar. Treffer aus der eigenen Bibliothek werden trotzdem angezeigt.
 
 ## Liste
 list-title = Meine Liste
-list-empty = Hier ist noch nichts. Such ein Buch, Hörbuch oder einen Film und füge es hinzu.
+list-empty = Hier ist noch nichts. Such ein Buch, Hörbuch, einen Film oder eine Serie und füge es hinzu.
 list-go-search = Zur Suche
 list-count = { $count ->
     [one] { $count } Eintrag
@@ -84,6 +89,9 @@ label-cast = Darsteller
 label-starring = mit
 label-directors = Regie
 label-directed-by = Regie:
+label-creators = Idee
+label-created-by = Idee:
+label-network = Sender
 label-original-title = Originaltitel
 label-movie-series = Filmreihe
 label-part = Teil
@@ -114,10 +122,10 @@ confirm-delete = Dieses Medium für alle Benutzer löschen? Das kann nicht rück
 ## Formular
 form-title-new = Medium manuell anlegen
 form-title-edit = Medium bearbeiten
-form-intro = Nichts gefunden? Hier kannst du ein Buch, Hörbuch oder einen Film selbst erfassen.
+form-intro = Nichts gefunden? Hier kannst du ein Buch, Hörbuch, einen Film oder eine Serie selbst erfassen.
 form-names-hint = Mehrere durch Komma trennen
 form-remove-cover = Cover entfernen
-form-error-type = Bitte Buch, Hörbuch oder Film auswählen.
+form-error-type = Bitte Buch, Hörbuch, Film oder Serie auswählen.
 form-error-done-year = Bitte ein gültiges Jahr angeben (oder leer lassen).
 form-error-title = Bitte einen Titel angeben.
 form-error-isbn = Die ISBN muss 10 oder 13 Stellen haben.
@@ -133,6 +141,8 @@ stats-books-wanted = Bücher auf der Wunschliste
 stats-audiobooks-wanted = Hörbücher auf der Wunschliste
 stats-movies-seen = Filme gesehen
 stats-movies-wanted = Filme auf der Wunschliste
+stats-series-seen = Serien gesehen
+stats-series-wanted = Serien auf der Wunschliste
 stats-no-year = ohne Jahr
 stats-per-year = Pro Jahr
 stats-year = Jahr
@@ -164,7 +174,7 @@ logged-out-text = Du wurdest von der Medienliste abgemeldet.
 logged-out-idp-hint = Beim Anmeldedienst bist du eventuell noch angemeldet. „Anmelden“ meldet dich dann ohne Passwortabfrage wieder an. Um dich ganz abzumelden, melde dich auch beim Anmeldedienst ab.
 
 ## Quellen-Hinweise
-tmdb-attribution = Filmdaten und Poster von TMDB. Dieses Produkt nutzt die TMDB-API, ist aber nicht von TMDB unterstützt oder zertifiziert.
+tmdb-attribution = Film- und Seriendaten sowie Poster von TMDB. Dieses Produkt nutzt die TMDB-API, ist aber nicht von TMDB unterstützt oder zertifiziert.
 
 ## Fehler
 error-notfound-title = Nicht gefunden

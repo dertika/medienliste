@@ -47,6 +47,7 @@ impl Provider for StubProvider {
             MediaType::Book => "stubbook",
             MediaType::Audiobook => "stubaudio",
             MediaType::Movie => "stubmovie",
+            MediaType::Series => "stubseries",
         }
     }
     fn media_type(&self) -> MediaType {
@@ -80,6 +81,19 @@ pub fn movie_hit(title: &str, id: &str) -> NewMedia {
         authors: vec!["Testregie".into()],
         narrators: vec!["Testdarstellerin".into()],
         source: "stubmovie".into(),
+        external_id: Some(id.into()),
+        ..Default::default()
+    }
+}
+
+pub fn series_hit(title: &str, id: &str) -> NewMedia {
+    NewMedia {
+        media_type: Some(MediaType::Series),
+        title: title.into(),
+        authors: vec!["Testidee".into()],
+        narrators: vec!["Testdarsteller".into()],
+        publisher: Some("Testsender".into()),
+        source: "stubseries".into(),
         external_id: Some(id.into()),
         ..Default::default()
     }
@@ -130,6 +144,7 @@ pub fn default_providers() -> Vec<Arc<dyn Provider>> {
             hits: vec![audio_hit("Der Schwarm", "B004V0L2VG")],
         }),
         Arc::new(StubProvider { kind: MediaType::Movie, hits: vec![movie_hit("Lola rennt", "104")] }),
+        Arc::new(StubProvider { kind: MediaType::Series, hits: vec![series_hit("Dark", "70523")] }),
     ]
 }
 

@@ -1,10 +1,10 @@
 # Medienliste
 
-Selbst gehostete Webapp zum Tracken von **Büchern**, **Hörbüchern** und **Filmen**: suchen, zur eigenen Liste hinzufügen, als „Gelesen/Gehört/Gesehen“ oder „Möchte ich lesen/hören/sehen“ markieren und jederzeit prüfen: *Habe ich das schon?*
+Selbst gehostete Webapp zum Tracken von **Büchern**, **Hörbüchern**, **Filmen** und **Serien**: suchen, zur eigenen Liste hinzufügen, als „Gelesen/Gehört/Gesehen“ oder „Möchte ich lesen/hören/sehen“ markieren und jederzeit prüfen: *Habe ich das schon?*
 
 - Login ausschließlich über **OpenID Connect** (Authelia, Authorization Code Flow mit PKCE), Benutzer werden beim ersten Login automatisch angelegt
 - Strikte Trennung: Jeder Benutzer sieht und bearbeitet nur seine eigenen Einträge
-- Metadaten aus **Google Books** (Fallback **Open Library**), dem **Audible-Katalog** (.de) mit **Audnexus** und für Filme aus **TMDB**; Cover werden lokal gecacht
+- Metadaten aus der **Deutschen Nationalbibliothek** und **Google Books** (Fallback **Open Library**), dem **Audible-Katalog** (.de) mit **Audnexus** und für Filme und Serien aus **TMDB**; Cover werden lokal gecacht
 - Pro Eintrag ein **Jahr** („2019 gelesen“), beim Abschließen vorbelegt und änderbar; die Statistik zählt danach
 - Manuelles Anlegen, wenn nichts gefunden wird
 - Statistik pro Jahr und Typ, Filter nach Typ und Status
@@ -36,8 +36,8 @@ Alle Assets, Templates, Migrationen und Sprachdateien sind in das Binary eingebe
 | `MEDIENLISTE_OIDC_SCOPES` | nein | `openid profile email groups` | Angefragte Scopes |
 | `MEDIENLISTE_OIDC_ADMIN_GROUP` | nein | – | Mitglieder dieser Authelia-Gruppe erhalten die Admin-Rolle (wird bei jedem Login neu ausgewertet) |
 | `MEDIENLISTE_OIDC_REQUIRED_GROUP` | nein | – | Wenn gesetzt, dürfen sich nur Mitglieder dieser Gruppe (oder der Admin-Gruppe) anmelden. Andere werden weder angelegt noch aktualisiert, und ihre bestehenden Sitzungen werden beim Anmeldeversuch beendet. |
-| `MEDIENLISTE_GOOGLE_BOOKS_API_KEY` | empfohlen | – | API-Key für Google Books. Ohne Key ist das anonyme Kontingent schnell erschöpft; dann springt Open Library ein. |
-| `MEDIENLISTE_TMDB_API_KEY` | für Filme | – | API-Key (v3) oder Lese-Token (v4) von [TMDB](https://www.themoviedb.org/settings/api), kostenlos. Ohne Key gibt es keine Filmsuche, Filme lassen sich aber manuell anlegen. |
+| `MEDIENLISTE_GOOGLE_BOOKS_API_KEY` | nein | – | API-Key für Google Books (liefert Cover und Klappentexte). Ohne Key wird Google Books nicht abgefragt, die Buchsuche läuft dann über die Deutsche Nationalbibliothek und Open Library. |
+| `MEDIENLISTE_TMDB_API_KEY` | für Filme/Serien | – | API-Key (v3) oder Lese-Token (v4) von [TMDB](https://www.themoviedb.org/settings/api), kostenlos. Ohne Key gibt es keine Film- und Seriensuche; manuell anlegen geht trotzdem. |
 | `MEDIENLISTE_AUDIBLE_MARKETPLACE` | nein | `de` | Audible-Marktplatz (`de`, `us`, `uk`, `fr`, `it`, `es`, `ca`, `au`, `in`, `jp`) |
 | `MEDIENLISTE_DATA_DIR` | nein | `/data` | Datenverzeichnis (Datenbank, Cover, Backups) |
 | `MEDIENLISTE_LISTEN` | nein | `0.0.0.0:8080` | Adresse und Port |
@@ -180,7 +180,7 @@ Für ein vollständiges Backup das ganze Datenverzeichnis sichern (z. B. mit res
 ## Datenmodell
 
 - `users`: Benutzer (Zuordnung über `sub`), Name, E-Mail, Admin-Flag
-- `media`: global geteilte Medien mit Typ `book`, `audiobook` oder `movie` sowie Titel, Untertitel bzw. Originaltitel, Autor(en) bzw. Regie, Sprecher bzw. Darsteller, Beschreibung, ISBN-10/13, ASIN, Erscheinungsjahr, Serie und Band, Sprache, Verlag, lokalem Cover, Quelle und externer ID
+- `media`: global geteilte Medien mit Typ `book`, `audiobook`, `movie` oder `series` sowie Titel, Untertitel bzw. Originaltitel, Autor(en) bzw. Regie, Sprecher bzw. Darsteller, Beschreibung, ISBN-10/13, ASIN, Erscheinungsjahr, Serie und Band, Sprache, Verlag, lokalem Cover, Quelle und externer ID
 - `user_media`: genau ein Status pro Benutzer und Medium (`done` oder `wanted`), dazu das Jahr des Lesens/Hörens/Sehens (`done_year`, änderbar), das Datum der letzten Statusänderung und das Datum des Hinzufügens
 - `sessions`, `login_states`: Sitzungen (nur gehashte Tokens) und kurzlebiger OIDC-Zustand
 
@@ -200,8 +200,12 @@ Migrationen liegen versioniert in `migrations/NNNN_name.sql` und werden beim Sta
 
 Provider implementieren das Trait `providers::Provider` (`search`, `fetch`) und werden in `Registry::from_config` registriert. Pro Medientyp werden sie der Reihe nach gefragt, der erste mit Treffern gewinnt:
 
-- **Bücher:** Google Books (zuerst deutsche Ausgaben, `langRestrict=de`), danach Open Library (deutsche Werke zuerst)
+- **Bücher:**
+  1. Google Books, nur mit `MEDIENLISTE_GOOGLE_BOOKS_API_KEY`; zuerst deutsche Ausgaben (`langRestrict=de`).
+  2. Deutsche Nationalbibliothek über die offene [SRU-Schnittstelle](https://www.dnb.de/sru) (MARC21). Sie verzeichnet nahezu alle in Deutschland erschienenen Bücher. E-Books und Tonträger werden ausgefiltert, mehrere Ausgaben eines Werks zusammengefasst. Die DNB liefert keine Cover, die kommen per ISBN von Open Library.
+  3. Open Library (deutsche Werke zuerst).
 - **Hörbücher:** Audible-Katalog-API für die Suche. Details holt Audnexus (Sprecher, Serie, Cover), bei Fehlern springt der Audible-Katalog ein.
+- **Serien:** TMDB (`/search/tv`). Beim Hinzufügen werden Idee (Creator), Sender und Besetzung nachgeladen. Es gibt keinen Staffel- oder Folgen-Fortschritt.
 - **Filme:** TMDB (deutsche Titel und Beschreibungen, Poster). Beim Hinzufügen werden die Details mit Regie, Besetzung und Filmreihe nachgeladen. Nur aktiv, wenn `MEDIENLISTE_TMDB_API_KEY` gesetzt ist.
 
   > Diese Software nutzt die TMDB-API, ist aber nicht von TMDB unterstützt oder zertifiziert. In der Filmsuche wird ein entsprechender Hinweis angezeigt.

@@ -9,16 +9,19 @@ pub enum MediaType {
     Book,
     Audiobook,
     Movie,
+    Series,
 }
 
 impl MediaType {
-    pub const ALL: [MediaType; 3] = [MediaType::Book, MediaType::Audiobook, MediaType::Movie];
+    pub const ALL: [MediaType; 4] =
+        [MediaType::Book, MediaType::Audiobook, MediaType::Movie, MediaType::Series];
 
     pub fn as_str(self) -> &'static str {
         match self {
             MediaType::Book => "book",
             MediaType::Audiobook => "audiobook",
             MediaType::Movie => "movie",
+            MediaType::Series => "series",
         }
     }
 
@@ -27,6 +30,7 @@ impl MediaType {
             "book" => Some(MediaType::Book),
             "audiobook" => Some(MediaType::Audiobook),
             "movie" => Some(MediaType::Movie),
+            "series" => Some(MediaType::Series),
             _ => None,
         }
     }
@@ -37,6 +41,7 @@ impl MediaType {
             MediaType::Book => 0,
             MediaType::Audiobook => 1,
             MediaType::Movie => 2,
+            MediaType::Series => 3,
         }
     }
 
@@ -46,6 +51,15 @@ impl MediaType {
 
     pub fn is_movie(self) -> bool {
         self == MediaType::Movie
+    }
+
+    pub fn is_series(self) -> bool {
+        self == MediaType::Series
+    }
+
+    /// Film oder Serie (Darsteller statt Sprecher, „gesehen“ statt „gelesen“).
+    pub fn is_screen(self) -> bool {
+        matches!(self, MediaType::Movie | MediaType::Series)
     }
 
     /// Hat dieser Typ Mitwirkende neben dem Urheber (Sprecher bzw. Darsteller)?
@@ -87,9 +101,11 @@ impl Status {
             (Status::Done, MediaType::Book) => "status-done-book",
             (Status::Done, MediaType::Audiobook) => "status-done-audiobook",
             (Status::Done, MediaType::Movie) => "status-done-movie",
+            (Status::Done, MediaType::Series) => "status-done-series",
             (Status::Wanted, MediaType::Book) => "status-wanted-book",
             (Status::Wanted, MediaType::Audiobook) => "status-wanted-audiobook",
             (Status::Wanted, MediaType::Movie) => "status-wanted-movie",
+            (Status::Wanted, MediaType::Series) => "status-wanted-series",
         }
     }
 }
