@@ -1,10 +1,10 @@
 <li class="card {{ card.type_class }}{% if card.status.status.is_some() %} owned{% endif %}">
-  {% if let Some(id) = card.media_id %}<a class="cover" href="{{ ctx.base }}medium/{{ id }}">{% else %}<span class="cover">{% endif %}
+  <a class="cover" href="{{ ctx.base }}{{ card.link }}">
     {% if let Some(c) = card.cover %}<img src="{{ c }}" alt="" loading="lazy" referrerpolicy="no-referrer" data-fallback="{{ card.type_icon }}">{% else %}<span class="cover-ph" aria-hidden="true">{{ card.type_icon }}</span>{% endif %}
-  {% if card.media_id.is_some() %}</a>{% else %}</span>{% endif %}
+  </a>
   <div class="info">
     <span class="type-badge {{ card.type_class }}">{{ card.type_icon }} {{ card.type_label }}</span>
-    <h3>{% if let Some(id) = card.media_id %}<a href="{{ ctx.base }}medium/{{ id }}">{{ card.title }}</a>{% else %}{{ card.title }}{% endif %}</h3>
+    <h3><a href="{{ ctx.base }}{{ card.link }}">{{ card.title }}</a></h3>
     {% if !card.subtitle.is_empty() %}<p class="subtitle">{{ card.subtitle }}</p>{% endif %}
     {% if !card.authors.is_empty() %}<p class="authors">{{ card.authors }}</p>{% endif %}
     {% if !card.narrators.is_empty() %}<p class="narrators">{{ card.narrators_label }} {{ card.narrators }}</p>{% endif %}

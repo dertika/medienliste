@@ -170,6 +170,8 @@ impl StatusView {
 #[derive(Clone, Debug)]
 pub struct Card {
     pub media_id: Option<i64>,
+    /// Ziel der Detailseite (relativ zu `ctx.base`): gespeichertes Medium oder Vorschau.
+    pub link: String,
     pub title: String,
     pub subtitle: String,
     pub authors: String,
@@ -267,6 +269,11 @@ pub fn type_icon(t: MediaType) -> &'static str {
     }
 }
 
+/// Vorschau eines noch nicht gespeicherten Suchtreffers.
+pub fn preview_link(source: &str, external_id: &str) -> String {
+    format!("vorschau/{}/{}", urlencoding::encode(source), urlencoding::encode(external_id))
+}
+
 pub fn cover_url(ctx: &Ctx, cover_file: &Option<String>) -> Option<String> {
     cover_file.as_ref().map(|f| format!("{}covers/{f}", ctx.base))
 }
@@ -286,6 +293,7 @@ impl Card {
     pub fn from_media(ctx: &Ctx, m: &Media, entry: Option<&Entry>, return_to: &str) -> Self {
         Card {
             media_id: Some(m.id),
+            link: format!("medium/{}", m.id),
             title: m.title.clone(),
             subtitle: m.subtitle.clone().unwrap_or_default(),
             authors: m.authors.join(", "),
@@ -312,8 +320,13 @@ impl Card {
         let mut status = StatusView::new(ctx, media_id, kind, entry.as_ref(), return_to);
         status.source = h.source.clone();
         status.external_id = h.external_id.clone().unwrap_or_default();
+        let link = match media_id {
+            Some(id) => format!("medium/{id}"),
+            None => preview_link(&h.source, &status.external_id),
+        };
         Card {
             media_id,
+            link,
             title: h.title.clone(),
             subtitle: h.subtitle.clone().unwrap_or_default(),
             authors: h.authors.join(", "),

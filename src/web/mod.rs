@@ -72,6 +72,7 @@ pub fn router(state: AppState) -> Router {
         .route("/", get(pages::home))
         .route("/suche", get(pages::search))
         .route("/suche/hinzufuegen", post(pages::add_from_search))
+        .route("/vorschau/{source}/{external_id}", get(pages::preview))
         .route("/liste", get(pages::list))
         .route("/medium/{id}", get(pages::detail))
         .route("/medium/{id}/status", post(pages::set_status))
