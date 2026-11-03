@@ -3,7 +3,7 @@
 use askama::Template;
 use axum::http::StatusCode;
 use axum::response::{Html, IntoResponse, Response};
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use chrono_tz::Tz;
 use fluent_bundle::FluentValue;
 
@@ -54,6 +54,10 @@ impl Ctx {
 
     pub fn date(&self, d: &DateTime<Utc>) -> String {
         d.with_timezone(&self.tz).format("%d.%m.%Y").to_string()
+    }
+
+    pub fn day(&self, d: NaiveDate) -> String {
+        d.format("%d.%m.%Y").to_string()
     }
 
     pub fn type_label(&self, t: MediaType) -> String {
@@ -126,6 +130,8 @@ pub struct StatusView {
     pub status_when: String,
     /// Jahr als Formularwert (leer = unbekannt).
     pub done_year: String,
+    /// Abschlussdatum für `<input type="date">` (YYYY-MM-DD) oder leer.
+    pub done_on: String,
     pub label_done: String,
     pub label_wanted: String,
     /// Zielseite für Formulare ohne JavaScript.
@@ -149,11 +155,15 @@ impl StatusView {
             status_text: entry.map(|e| ctx.status_label(e.status, kind)).unwrap_or_default(),
             status_when: entry
                 .map(|e| match e.status {
-                    Status::Done => e.done_year.map(|y| y.to_string()).unwrap_or_default(),
+                    Status::Done => done_text(ctx, e),
                     Status::Wanted => format!("{} {}", ctx.t("status-since"), ctx.date(&e.status_changed_at)),
                 })
                 .unwrap_or_default(),
             done_year: entry.and_then(|e| e.done_year).map(|y| y.to_string()).unwrap_or_default(),
+            done_on: entry
+                .and_then(|e| e.done_on)
+                .map(|d| d.format("%Y-%m-%d").to_string())
+                .unwrap_or_default(),
             label_done: ctx.status_label(Status::Done, kind),
             label_wanted: ctx.status_label(Status::Wanted, kind),
             return_to: return_to.to_string(),
@@ -223,13 +233,22 @@ impl ListItem {
             type_class: type_class(m.media_type),
             icon_id: icon_id(m.media_type),
             status_class: e.status.as_str(),
-            status_text: match e.done_year {
-                Some(y) if e.status == Status::Done => {
-                    format!("{} {y}", ctx.status_label(e.status, m.media_type))
+            status_text: match done_text(ctx, e) {
+                d if e.status == Status::Done && !d.is_empty() => {
+                    format!("{} {d}", ctx.status_label(e.status, m.media_type))
                 }
                 _ => ctx.status_label(e.status, m.media_type),
             },
         }
+    }
+}
+
+/// Abschlussdatum (TT.MM.JJJJ), sonst Jahr, sonst leer.
+fn done_text(ctx: &Ctx, e: &Entry) -> String {
+    match (e.done_on, e.done_year) {
+        (Some(d), _) => ctx.day(d),
+        (None, Some(y)) => y.to_string(),
+        (None, None) => String::new(),
     }
 }
 

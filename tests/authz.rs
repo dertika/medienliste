@@ -14,8 +14,24 @@ async fn setup() -> (Harness, TestUser, TestUser, i64, i64) {
     let b = h.user("user-b", false).await;
     let schwarm = h.media(&book_hit("Der Schwarm", "b1", "9783596164530"), Some(a.id)).await;
     let momo = h.media(&book_hit("Momo", "b3", "9783522202107"), Some(b.id)).await;
-    entries::set_status(&h.pool, a.id, schwarm, Status::Done, 2024).await.unwrap();
-    entries::set_status(&h.pool, b.id, momo, Status::Wanted, 2024).await.unwrap();
+    entries::set_status(
+        &h.pool,
+        a.id,
+        schwarm,
+        Status::Done,
+        chrono::NaiveDate::from_ymd_opt(2024, 5, 1).unwrap(),
+    )
+    .await
+    .unwrap();
+    entries::set_status(
+        &h.pool,
+        b.id,
+        momo,
+        Status::Wanted,
+        chrono::NaiveDate::from_ymd_opt(2024, 5, 1).unwrap(),
+    )
+    .await
+    .unwrap();
     (h, a, b, schwarm, momo)
 }
 

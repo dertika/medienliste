@@ -314,6 +314,7 @@ table.stats td { width: 22%; position: relative; white-space: nowrap; }
 .year-form { display: flex; align-items: center; gap: .4rem; margin: .5rem 0 0; flex-wrap: wrap; }
 .year-form label { font-size: .85rem; }
 .year-form input { width: 6.5rem; min-height: 36px; padding: .3rem .5rem; }
+.year-form input[type="date"] { width: 10rem; }
 .btn.small { min-height: 36px; padding: .3rem .8rem; font-size: .85rem; }
 .status-choice .done-year { display: flex; flex-direction: column; color: var(--muted); font-size: .9rem; }
 .status-choice .done-year input { width: 7rem; }

@@ -1,6 +1,6 @@
 //! Domänenmodelle.
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -180,6 +180,8 @@ pub struct Entry {
     pub added_at: DateTime<Utc>,
     /// Jahr, in dem gelesen/gehört/gesehen wurde (nur bei Status „done“).
     pub done_year: Option<i32>,
+    /// Genaues Abschlussdatum, falls bekannt (dann gilt `done_year` = dessen Jahr).
+    pub done_on: Option<NaiveDate>,
 }
 
 /// Normalisiert Text für die einfache Volltextsuche (Kleinbuchstaben, Umlaute vereinheitlicht).

@@ -23,7 +23,9 @@
     <input type="hidden" name="csrf" value="{{ ctx.csrf }}">
     <input type="hidden" name="return_to" value="{{ s.return_to }}">
     <input type="hidden" name="show_remove" value="1">
-    <label for="done-year-{{ id }}">{{ ctx.t("label-done-year") }}</label>
+    <label for="done-on-{{ id }}">{{ ctx.t("label-done-on") }}</label>
+    <input id="done-on-{{ id }}" type="date" name="date" value="{{ s.done_on }}" min="1900-01-01">
+    <label for="done-year-{{ id }}">{{ ctx.t("label-done-year-only") }}</label>
     <input id="done-year-{{ id }}" type="number" name="year" value="{{ s.done_year }}" min="1900" max="2100" inputmode="numeric" placeholder="{{ ctx.t("year-unknown") }}">
     <button type="submit" class="btn small">{{ ctx.t("action-save") }}</button>
   </form>

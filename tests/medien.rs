@@ -56,7 +56,8 @@ async fn movie_search_and_add_sets_current_year() {
     // Liste mit Typfilter
     let (_, _, body) = h.get("/liste?typ=movie", Some(&a)).await;
     assert!(body.contains("Lola rennt"));
-    assert!(body.contains(&format!("Gesehen {}", this_year())));
+    let today = chrono::Utc::now().with_timezone(&chrono_tz::Europe::Berlin).format("%d.%m.%Y");
+    assert!(body.contains(&format!("Gesehen {today}")), "Abschlussdatum = heute");
     let (_, _, body) = h.get("/liste?typ=book", Some(&a)).await;
     assert!(!body.contains("Lola rennt"));
 }
@@ -198,9 +199,15 @@ async fn movie_series_uses_part_and_assets_are_versioned() {
     m.series = Some("Der Herr der Ringe".into());
     m.series_index = Some("1".into());
     let id = h.media(&m, Some(a.id)).await;
-    medienliste::repo::entries::set_status(&h.pool, a.id, id, medienliste::models::Status::Wanted, 2026)
-        .await
-        .unwrap();
+    medienliste::repo::entries::set_status(
+        &h.pool,
+        a.id,
+        id,
+        medienliste::models::Status::Wanted,
+        chrono::NaiveDate::from_ymd_opt(2026, 1, 1).unwrap(),
+    )
+    .await
+    .unwrap();
 
     let (_, _, body) = h.get("/liste", Some(&a)).await;
     assert!(body.contains("Der Herr der Ringe · Teil 1"), "{body}");
@@ -348,4 +355,107 @@ async fn list_sorts_by_done_year() {
     let pos = |t: &str| body.find(&format!(">{t}<")).unwrap_or_else(|| panic!("{t} fehlt"));
     let order = ["Neu", "Mitte", "Alt", "Ohne", "Merk"].map(pos);
     assert!(order.windows(2).all(|w| w[0] < w[1]), "{order:?}");
+}
+
+async fn done_on(h: &Harness, user_id: i64, media_id: i64) -> Option<String> {
+    sqlx::query_scalar("SELECT done_on FROM user_media WHERE user_id = ?1 AND media_id = ?2")
+        .bind(user_id)
+        .bind(media_id)
+        .fetch_one(&h.pool)
+        .await
+        .unwrap()
+}
+
+#[tokio::test]
+async fn done_date_can_be_set_and_wins_over_year() {
+    let h = harness().await;
+    let a = h.user("user-a", false).await;
+    let b = h.user("user-b", false).await;
+    let id = add_movie(&h, &a, "done").await;
+    assert!(done_on(&h, a.id, id).await.is_some(), "heute vorbelegt");
+
+    // Datum setzt auch das Jahr.
+    let (st, _, _) =
+        h.post(&format!("/medium/{id}/jahr"), Some(&a), &[("date", "2021-03-14"), ("year", "1999")]).await;
+    assert_eq!(st, StatusCode::SEE_OTHER);
+    assert_eq!(done_on(&h, a.id, id).await.as_deref(), Some("2021-03-14"));
+    assert_eq!(done_year(&h, a.id, id).await, Some(2021));
+    let (_, _, body) = h.get(&format!("/medium/{id}"), Some(&a)).await;
+    assert!(body.contains("14.03.2021"));
+    assert!(body.contains(r#"value="2021-03-14""#));
+    let (_, _, body) = h.get("/liste", Some(&a)).await;
+    assert!(body.contains("Gesehen 14.03.2021"), "{body}");
+
+    // Nur Jahr: Datum wird entfernt.
+    h.post(&format!("/medium/{id}/jahr"), Some(&a), &[("date", ""), ("year", "2019")]).await;
+    assert_eq!(done_on(&h, a.id, id).await, None);
+    assert_eq!(done_year(&h, a.id, id).await, Some(2019));
+
+    // Ungültig oder in der Zukunft → abgelehnt, nichts geändert.
+    let future = (chrono::Utc::now().date_naive() + chrono::Days::new(3)).format("%Y-%m-%d").to_string();
+    for bad in ["2021-02-30", "14.03.2021", "1850-01-01", &future] {
+        let (st, _, _) = h.post(&format!("/medium/{id}/jahr"), Some(&a), &[("date", bad)]).await;
+        assert_eq!(st, StatusCode::BAD_REQUEST, "{bad}");
+    }
+    assert_eq!(done_year(&h, a.id, id).await, Some(2019));
+
+    // Fremder Eintrag lässt sich nicht ändern.
+    let (st, _, _) = h.post(&format!("/medium/{id}/jahr"), Some(&b), &[("date", "2020-01-01")]).await;
+    assert_eq!(st, StatusCode::NOT_FOUND);
+
+    // Statuswechsel auf „Möchte ich“ entfernt Datum und Jahr.
+    h.post(&format!("/medium/{id}/status"), Some(&a), &[("status", "wanted")]).await;
+    assert_eq!(done_on(&h, a.id, id).await, None);
+    assert_eq!(done_year(&h, a.id, id).await, None);
+}
+
+#[tokio::test]
+async fn list_sorts_by_done_date_within_year() {
+    let h = harness().await;
+    let a = h.user("user-a", false).await;
+    for (i, (title, date)) in
+        [("Januar", "2023-01-05"), ("Dezember", "2023-12-20"), ("Nur2023", "")].iter().enumerate()
+    {
+        let id = h.media(&book_hit(title, &format!("d{i}"), &format!("978111111111{i}")), None).await;
+        h.post(&format!("/medium/{id}/status"), Some(&a), &[("status", "done")]).await;
+        h.post(&format!("/medium/{id}/jahr"), Some(&a), &[("date", date), ("year", "2023")]).await;
+    }
+    let (_, _, body) = h.get("/liste?sort=done", Some(&a)).await;
+    let pos = |t: &str| body.find(&format!(">{t}<")).unwrap_or_else(|| panic!("{t} fehlt"));
+    let order = ["Dezember", "Januar", "Nur2023"].map(pos);
+    assert!(order.windows(2).all(|w| w[0] < w[1]), "{order:?}");
+}
+
+#[tokio::test]
+async fn manual_entry_with_done_date() {
+    use axum::body::Body;
+    use axum::http::Request;
+    let h = harness().await;
+    let a = h.user("user-a", false).await;
+    let boundary = "----medientest";
+    let mut body = String::new();
+    for (k, v) in [
+        ("csrf", a.csrf.as_str()),
+        ("media_type", "book"),
+        ("title", "Handbuch"),
+        ("status", "done"),
+        ("done_on", "2022-07-01"),
+        ("done_year", "2026"),
+    ] {
+        body.push_str(&format!(
+            "--{boundary}\r\nContent-Disposition: form-data; name=\"{k}\"\r\n\r\n{v}\r\n"
+        ));
+    }
+    body.push_str(&format!("--{boundary}--\r\n"));
+    let req = Request::post("/neu")
+        .header(header::CONTENT_TYPE, format!("multipart/form-data; boundary={boundary}"))
+        .header(header::COOKIE, &a.cookie)
+        .header(header::ORIGIN, ORIGIN)
+        .body(Body::from(body))
+        .unwrap();
+    let (st, headers, body) = h.request(req).await;
+    assert_eq!(st, StatusCode::SEE_OTHER, "{body}");
+    let id: i64 = headers[header::LOCATION].to_str().unwrap().trim_start_matches("/medium/").parse().unwrap();
+    assert_eq!(done_on(&h, a.id, id).await.as_deref(), Some("2022-07-01"));
+    assert_eq!(done_year(&h, a.id, id).await, Some(2022), "Datum hat Vorrang vor dem Jahr");
 }
