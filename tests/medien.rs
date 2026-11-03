@@ -459,3 +459,19 @@ async fn manual_entry_with_done_date() {
     assert_eq!(done_on(&h, a.id, id).await.as_deref(), Some("2022-07-01"));
     assert_eq!(done_year(&h, a.id, id).await, Some(2022), "Datum hat Vorrang vor dem Jahr");
 }
+
+#[tokio::test]
+async fn stat_tiles_link_to_filtered_list() {
+    let h = harness().await;
+    let a = h.user("user-a", false).await;
+    add_movie(&h, &a, "done").await;
+    let (_, _, body) = h.get("/statistik", Some(&a)).await;
+    assert!(body.contains(r#"href="/liste?typ=movie&#38;status=done&#38;sort=done""#), "{body}");
+    assert!(body.contains(r#"href="/liste?typ=book&#38;status=wanted&#38;sort=added""#));
+
+    let (st, _, body) = h.get("/liste?typ=movie&status=done&sort=done", Some(&a)).await;
+    assert_eq!(st, StatusCode::OK);
+    assert!(body.contains("Lola rennt"));
+    let (_, _, body) = h.get("/liste?typ=movie&status=wanted&sort=added", Some(&a)).await;
+    assert!(!body.contains("Lola rennt"));
+}

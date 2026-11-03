@@ -4,7 +4,7 @@
 <h1>{{ ctx.t("stats-title") }}</h1>
 <div class="tiles">
   {% for t in tiles %}
-  <div class="tile {{ t.class }}"><span class="num">{{ t.num }}</span><span>{{ t.icon }} {{ t.label }}</span></div>
+  <a class="tile {{ t.class }}" href="{{ ctx.base }}{{ t.link }}"><span class="num">{{ t.num }}</span><span>{{ t.icon }} {{ t.label }}</span></a>
   {% endfor %}
 </div>
 <h2>{{ ctx.t("stats-per-year") }}</h2>

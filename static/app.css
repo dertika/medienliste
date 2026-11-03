@@ -285,6 +285,9 @@ label > input, label > select, label > textarea { margin-top: .25rem; color: var
 .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
 @media (min-width: 760px) { .tiles { grid-template-columns: repeat(4, 1fr); } }
 .tile { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: .6rem .75rem; display: flex; flex-direction: column; gap: .2rem; font-size: .9rem; color: var(--muted); }
+a.tile { text-decoration: none; transition: border-color .15s, transform .1s; }
+a.tile:hover, a.tile:focus-visible { border-color: var(--primary); }
+a.tile:active { transform: scale(.98); }
 .tile .num { font-size: 1.6rem; font-weight: 700; color: var(--text); }
 .tile.book { border-left: 5px solid var(--book); }
 .tile.audiobook { border-left: 5px solid var(--audio); }

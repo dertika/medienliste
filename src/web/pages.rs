@@ -888,6 +888,8 @@ pub struct StatTile {
     label: String,
     class: &'static str,
     icon: &'static str,
+    /// „Meine Liste“ mit dem Filter dieser Kachel (relativ zu `ctx.base`).
+    link: String,
 }
 
 pub struct StatHead {
@@ -943,6 +945,11 @@ pub async fn stats(State(st): State<AppState>, cu: CurrentUser) -> Result<Respon
                 label: ctx.t(keys[t.index()]),
                 class: if wanted { "" } else { t.as_str() },
                 icon: if wanted { "☆" } else { type_icon(t) },
+                link: if wanted {
+                    format!("liste?typ={}&status=wanted&sort=added", t.as_str())
+                } else {
+                    format!("liste?typ={}&status=done&sort=done", t.as_str())
+                },
             });
         }
     }
