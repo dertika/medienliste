@@ -548,6 +548,8 @@ pub mod entries {
         Title,
         Author,
         Added,
+        /// Nach dem Jahr „gelesen/gehört/gesehen“, neueste zuerst; Merkliste danach.
+        DoneYear,
     }
 
     impl Sort {
@@ -556,6 +558,7 @@ pub mod entries {
                 "title" => Sort::Title,
                 "author" => Sort::Author,
                 "added" => Sort::Added,
+                "done" => Sort::DoneYear,
                 _ => Sort::Changed,
             }
         }
@@ -565,6 +568,7 @@ pub mod entries {
                 Sort::Title => "title",
                 Sort::Author => "author",
                 Sort::Added => "added",
+                Sort::DoneYear => "done",
             }
         }
         fn order_by(self) -> &'static str {
@@ -576,6 +580,10 @@ pub mod entries {
                                  CAST(m.series_index AS REAL), m.title COLLATE NOCASE"
                 }
                 Sort::Added => "um.added_at DESC, m.id DESC",
+                Sort::DoneYear => {
+                    "um.status <> 'done', um.done_year IS NULL, um.done_year DESC, \
+                                 um.status_changed_at DESC, m.title COLLATE NOCASE"
+                }
             }
         }
     }

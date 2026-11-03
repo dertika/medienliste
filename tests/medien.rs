@@ -322,3 +322,30 @@ async fn search_hit_opens_preview_without_saving() {
     let (st, _, _) = h.get("/vorschau/stubbook/b1", None).await;
     assert_ne!(st, StatusCode::OK, "nur angemeldet");
 }
+
+#[tokio::test]
+async fn list_sorts_by_done_year() {
+    let h = harness().await;
+    let a = h.user("user-a", false).await;
+    let titles = [
+        ("Alt", Some("2010")),
+        ("Neu", Some("2024")),
+        ("Mitte", Some("2018")),
+        ("Ohne", Some("")),
+        ("Merk", None),
+    ];
+    for (i, (title, year)) in titles.iter().enumerate() {
+        let id = h.media(&book_hit(title, &format!("x{i}"), &format!("978000000000{i}")), None).await;
+        let status = if year.is_some() { "done" } else { "wanted" };
+        h.post(&format!("/medium/{id}/status"), Some(&a), &[("status", status)]).await;
+        if let Some(y) = year {
+            h.post(&format!("/medium/{id}/jahr"), Some(&a), &[("year", y)]).await;
+        }
+    }
+    let (st, _, body) = h.get("/liste?sort=done", Some(&a)).await;
+    assert_eq!(st, StatusCode::OK);
+    assert!(body.contains(r#"<option value="done" selected>"#));
+    let pos = |t: &str| body.find(&format!(">{t}<")).unwrap_or_else(|| panic!("{t} fehlt"));
+    let order = ["Neu", "Mitte", "Alt", "Ohne", "Merk"].map(pos);
+    assert!(order.windows(2).all(|w| w[0] < w[1]), "{order:?}");
+}

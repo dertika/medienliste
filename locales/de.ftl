@@ -75,6 +75,7 @@ filter-text-placeholder = Titel, Autor, Serie …
 filter-apply = Anwenden
 sort-changed = Zuletzt geändert
 sort-added = Zuletzt hinzugefügt
+sort-done = Jahr gelesen/gehört/gesehen
 sort-title = Titel
 sort-author = Autor
 pager-prev = Zurück
