@@ -4,7 +4,7 @@
 //! `user_id` des angemeldeten Benutzers als ersten Parameter und filtern jede Abfrage
 //! danach. Die `user_id` stammt immer aus der Sitzung, nie aus der Anfrage.
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Datelike, NaiveDate, Utc};
 use sqlx::{FromRow, SqlitePool};
 
 use crate::models::{Entry, Media, MediaType, NewMedia, Status, User, normalize};
@@ -449,12 +449,21 @@ pub mod entries {
     use super::*;
     use std::collections::BTreeMap;
 
+    /// Wann ein Medium gelesen/gehört/gesehen wurde.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub enum Done {
+        Unknown,
+        Year(i32),
+        Date(NaiveDate),
+    }
+
     #[derive(FromRow)]
     struct EntryRow {
         status: String,
         status_changed_at: DateTime<Utc>,
         added_at: DateTime<Utc>,
         done_year: Option<i32>,
+        done_on: Option<NaiveDate>,
     }
 
     impl From<EntryRow> for Entry {
@@ -464,13 +473,14 @@ pub mod entries {
                 status_changed_at: r.status_changed_at,
                 added_at: r.added_at,
                 done_year: r.done_year,
+                done_on: r.done_on,
             }
         }
     }
 
     pub async fn get(pool: &SqlitePool, user_id: i64, media_id: i64) -> DbResult<Option<Entry>> {
         let r: Option<EntryRow> = sqlx::query_as(
-            "SELECT status, status_changed_at, added_at, done_year FROM user_media
+            "SELECT status, status_changed_at, added_at, done_year, done_on FROM user_media
              WHERE user_id = ?1 AND media_id = ?2",
         )
         .bind(user_id)
@@ -480,20 +490,20 @@ pub mod entries {
         Ok(r.map(Into::into))
     }
 
-    /// Setzt den Status. Änderungsdatum und Jahr werden nur aktualisiert, wenn sich der
-    /// Status ändert: Beim Wechsel auf „done“ wird `current_year` als Jahr vorbelegt,
-    /// bei „wanted“ wird das Jahr entfernt.
+    /// Setzt den Status. Änderungsdatum, Jahr und Abschlussdatum werden nur aktualisiert,
+    /// wenn sich der Status ändert: Beim Wechsel auf „done“ wird `today` vorbelegt,
+    /// bei „wanted“ werden Jahr und Datum entfernt.
     pub async fn set_status(
         pool: &SqlitePool,
         user_id: i64,
         media_id: i64,
         status: Status,
-        current_year: i32,
+        today: NaiveDate,
     ) -> DbResult<()> {
-        let year = (status == Status::Done).then_some(current_year);
+        let done_on = (status == Status::Done).then_some(today);
         sqlx::query(
-            "INSERT INTO user_media (user_id, media_id, status, status_changed_at, added_at, done_year)
-             VALUES (?1, ?2, ?3, ?4, ?4, ?5)
+            "INSERT INTO user_media (user_id, media_id, status, status_changed_at, added_at, done_year, done_on)
+             VALUES (?1, ?2, ?3, ?4, ?4, ?5, ?6)
              ON CONFLICT(user_id, media_id) DO UPDATE SET
                 status_changed_at = CASE WHEN user_media.status = excluded.status
                                          THEN user_media.status_changed_at
@@ -501,32 +511,38 @@ pub mod entries {
                 done_year = CASE WHEN user_media.status = excluded.status
                                  THEN user_media.done_year
                                  ELSE excluded.done_year END,
+                done_on = CASE WHEN user_media.status = excluded.status
+                               THEN user_media.done_on
+                               ELSE excluded.done_on END,
                 status = excluded.status",
         )
         .bind(user_id)
         .bind(media_id)
         .bind(status.as_str())
         .bind(now())
-        .bind(year)
+        .bind(done_on.map(|d| d.year()))
+        .bind(done_on)
         .execute(pool)
         .await?;
         Ok(())
     }
 
-    /// Ändert das Jahr eines eigenen, abgeschlossenen Eintrags. `false`, wenn es keinen gibt.
-    pub async fn set_done_year(
-        pool: &SqlitePool,
-        user_id: i64,
-        media_id: i64,
-        year: Option<i32>,
-    ) -> DbResult<bool> {
+    /// Ändert Abschlussdatum bzw. -jahr eines eigenen, abgeschlossenen Eintrags.
+    /// Ein Datum legt auch das Jahr fest. `false`, wenn es keinen Eintrag gibt.
+    pub async fn set_done(pool: &SqlitePool, user_id: i64, media_id: i64, done: Done) -> DbResult<bool> {
+        let (year, date) = match done {
+            Done::Unknown => (None, None),
+            Done::Year(y) => (Some(y), None),
+            Done::Date(d) => (Some(d.year()), Some(d)),
+        };
         let r = sqlx::query(
-            "UPDATE user_media SET done_year = ?3
+            "UPDATE user_media SET done_year = ?3, done_on = ?4
              WHERE user_id = ?1 AND media_id = ?2 AND status = 'done'",
         )
         .bind(user_id)
         .bind(media_id)
         .bind(year)
+        .bind(date)
         .execute(pool)
         .await?;
         Ok(r.rows_affected() > 0)
@@ -548,6 +564,8 @@ pub mod entries {
         Title,
         Author,
         Added,
+        /// Nach dem Jahr „gelesen/gehört/gesehen“, neueste zuerst; Merkliste danach.
+        DoneYear,
     }
 
     impl Sort {
@@ -556,6 +574,7 @@ pub mod entries {
                 "title" => Sort::Title,
                 "author" => Sort::Author,
                 "added" => Sort::Added,
+                "done" => Sort::DoneYear,
                 _ => Sort::Changed,
             }
         }
@@ -565,6 +584,7 @@ pub mod entries {
                 Sort::Title => "title",
                 Sort::Author => "author",
                 Sort::Added => "added",
+                Sort::DoneYear => "done",
             }
         }
         fn order_by(self) -> &'static str {
@@ -576,6 +596,11 @@ pub mod entries {
                                  CAST(m.series_index AS REAL), m.title COLLATE NOCASE"
                 }
                 Sort::Added => "um.added_at DESC, m.id DESC",
+                Sort::DoneYear => {
+                    "um.status <> 'done', um.done_year IS NULL, um.done_year DESC, \
+                                 um.done_on IS NULL, um.done_on DESC, \
+                                 um.status_changed_at DESC, m.title COLLATE NOCASE"
+                }
             }
         }
     }
@@ -639,7 +664,7 @@ pub mod entries {
 
         let sql = format!(
             "SELECT {cols}, um.status AS e_status, um.status_changed_at AS e_changed,
-                    um.added_at AS e_added, um.done_year AS e_year
+                    um.added_at AS e_added, um.done_year AS e_year, um.done_on AS e_on
              FROM user_media um JOIN media m ON m.id = um.media_id
              WHERE {where_sql} ORDER BY {order} LIMIT ? OFFSET ?",
             cols = media::COLUMNS,
@@ -661,6 +686,7 @@ pub mod entries {
                 status_changed_at: row.try_get("e_changed")?,
                 added_at: row.try_get("e_added")?,
                 done_year: row.try_get("e_year")?,
+                done_on: row.try_get("e_on")?,
             };
             out.push((m.into(), e));
         }

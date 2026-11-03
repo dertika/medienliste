@@ -23,6 +23,7 @@
     <select name="sort">
       <option value="changed"{% if sort == "changed" %} selected{% endif %}>{{ ctx.t("sort-changed") }}</option>
       <option value="added"{% if sort == "added" %} selected{% endif %}>{{ ctx.t("sort-added") }}</option>
+      <option value="done"{% if sort == "done" %} selected{% endif %}>{{ ctx.t("sort-done") }}</option>
       <option value="title"{% if sort == "title" %} selected{% endif %}>{{ ctx.t("sort-title") }}</option>
       <option value="author"{% if sort == "author" %} selected{% endif %}>{{ ctx.t("sort-author") }}</option>
     </select>

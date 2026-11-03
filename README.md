@@ -5,7 +5,7 @@ Selbst gehostete Webapp zum Tracken von **Büchern**, **Hörbüchern**, **Filmen
 - Login ausschließlich über **OpenID Connect** (Authelia, Authorization Code Flow mit PKCE), Benutzer werden beim ersten Login automatisch angelegt
 - Strikte Trennung: Jeder Benutzer sieht und bearbeitet nur seine eigenen Einträge
 - Metadaten aus der **Deutschen Nationalbibliothek** und **Google Books** (Fallback **Open Library**), dem **Audible-Katalog** (.de) mit **Audnexus** und für Filme und Serien aus **TMDB**; Cover werden lokal gecacht
-- Pro Eintrag ein **Jahr** („2019 gelesen“), beim Abschließen vorbelegt und änderbar; die Statistik zählt danach
+- Pro Eintrag ein **Abschlussdatum** („Gelesen 14.03.2021“) oder nur ein **Jahr**, beim Abschließen mit heute vorbelegt und änderbar; die Statistik zählt nach Jahr, die Liste lässt sich danach sortieren
 - Manuelles Anlegen, wenn nichts gefunden wird
 - Statistik pro Jahr und Typ, Filter nach Typ und Status
 - Für das iPhone optimiert, als PWA installierbar („Zum Home-Bildschirm“)
@@ -181,7 +181,7 @@ Für ein vollständiges Backup das ganze Datenverzeichnis sichern (z. B. mit res
 
 - `users`: Benutzer (Zuordnung über `sub`), Name, E-Mail, Admin-Flag
 - `media`: global geteilte Medien mit Typ `book`, `audiobook`, `movie` oder `series` sowie Titel, Untertitel bzw. Originaltitel, Autor(en) bzw. Regie, Sprecher bzw. Darsteller, Beschreibung, ISBN-10/13, ASIN, Erscheinungsjahr, Serie und Band, Sprache, Verlag, lokalem Cover, Quelle und externer ID
-- `user_media`: genau ein Status pro Benutzer und Medium (`done` oder `wanted`), dazu das Jahr des Lesens/Hörens/Sehens (`done_year`, änderbar), das Datum der letzten Statusänderung und das Datum des Hinzufügens
+- `user_media`: genau ein Status pro Benutzer und Medium (`done` oder `wanted`), dazu Datum (`done_on`, optional) und Jahr (`done_year`) des Lesens/Hörens/Sehens, das Datum der letzten Statusänderung und das Datum des Hinzufügens
 - `sessions`, `login_states`: Sitzungen (nur gehashte Tokens) und kurzlebiger OIDC-Zustand
 
 Migrationen liegen versioniert in `migrations/NNNN_name.sql` und werden beim Start automatisch angewendet. Mit `medienliste migrate` lassen sie sich auch einzeln ausführen.

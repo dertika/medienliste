@@ -38,7 +38,8 @@
     <legend>{{ ctx.t("filter-status") }}</legend>
     <label><input type="radio" name="status" value="done"{% if f.status == "done" %} checked{% endif %}> ✓ <span data-types="book"{% if f.hide("book") %} hidden{% endif %}>{{ ctx.t("status-done-book") }}</span><span data-types="audiobook"{% if f.hide("audiobook") %} hidden{% endif %}>{{ ctx.t("status-done-audiobook") }}</span><span data-types="movie"{% if f.hide("movie") %} hidden{% endif %}>{{ ctx.t("status-done-movie") }}</span><span data-types="series"{% if f.hide("series") %} hidden{% endif %}>{{ ctx.t("status-done-series") }}</span></label>
     <label><input type="radio" name="status" value="wanted"{% if f.status != "done" %} checked{% endif %}> ☆ <span data-types="book"{% if f.hide("book") %} hidden{% endif %}>{{ ctx.t("status-wanted-book") }}</span><span data-types="audiobook"{% if f.hide("audiobook") %} hidden{% endif %}>{{ ctx.t("status-wanted-audiobook") }}</span><span data-types="movie"{% if f.hide("movie") %} hidden{% endif %}>{{ ctx.t("status-wanted-movie") }}</span><span data-types="series"{% if f.hide("series") %} hidden{% endif %}>{{ ctx.t("status-wanted-series") }}</span></label>
-    <label class="done-year">{{ ctx.t("label-done-year") }}<input type="number" name="done_year" value="{{ f.done_year }}" min="1900" max="2100" inputmode="numeric" placeholder="{{ ctx.t("year-unknown") }}"></label>
+    <label class="done-year">{{ ctx.t("label-done-on") }}<input type="date" name="done_on" value="{{ f.done_on }}" min="1900-01-01"></label>
+    <label class="done-year">{{ ctx.t("label-done-year-only") }}<input type="number" name="done_year" value="{{ f.done_year }}" min="1900" max="2100" inputmode="numeric" placeholder="{{ ctx.t("year-unknown") }}"></label>
   </fieldset>
   {% endif %}
   <div class="actions">

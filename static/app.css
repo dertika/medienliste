@@ -285,6 +285,9 @@ label > input, label > select, label > textarea { margin-top: .25rem; color: var
 .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
 @media (min-width: 760px) { .tiles { grid-template-columns: repeat(4, 1fr); } }
 .tile { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: .6rem .75rem; display: flex; flex-direction: column; gap: .2rem; font-size: .9rem; color: var(--muted); }
+a.tile { text-decoration: none; transition: border-color .15s, transform .1s; }
+a.tile:hover, a.tile:focus-visible { border-color: var(--primary); }
+a.tile:active { transform: scale(.98); }
 .tile .num { font-size: 1.6rem; font-weight: 700; color: var(--text); }
 .tile.book { border-left: 5px solid var(--book); }
 .tile.audiobook { border-left: 5px solid var(--audio); }
@@ -314,6 +317,7 @@ table.stats td { width: 22%; position: relative; white-space: nowrap; }
 .year-form { display: flex; align-items: center; gap: .4rem; margin: .5rem 0 0; flex-wrap: wrap; }
 .year-form label { font-size: .85rem; }
 .year-form input { width: 6.5rem; min-height: 36px; padding: .3rem .5rem; }
+.year-form input[type="date"] { width: 10rem; }
 .btn.small { min-height: 36px; padding: .3rem .8rem; font-size: .85rem; }
 .status-choice .done-year { display: flex; flex-direction: column; color: var(--muted); font-size: .9rem; }
 .status-choice .done-year input { width: 7rem; }

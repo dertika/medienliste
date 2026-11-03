@@ -6,6 +6,7 @@ use axum::Form;
 use axum::extract::{Multipart, Path, Query, State};
 use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Redirect, Response};
+use chrono::{Datelike, NaiveDate};
 use serde::Deserialize;
 
 use super::views::{
@@ -14,6 +15,7 @@ use super::views::{
 use super::{AppError, AppState};
 use crate::auth::{CurrentUser, require_admin, safe_return_to};
 use crate::models::{Media, MediaType, NewMedia, Status, clean_isbn, isbn10_to_13};
+use crate::repo::entries::Done;
 use crate::repo::{self, entries, media};
 
 const PAGE_SIZE: i64 = 60;
@@ -32,10 +34,9 @@ fn redirect_back(st: &AppState, return_to: &str, fallback: &str) -> Response {
     Redirect::to(&format!("{}{}", st.cfg.base_path(), target)).into_response()
 }
 
-/// Aktuelles Jahr in der konfigurierten Zeitzone.
-fn current_year(st: &AppState) -> i32 {
-    use chrono::Datelike;
-    chrono::Utc::now().with_timezone(&st.cfg.timezone).year()
+/// Heutiges Datum in der konfigurierten Zeitzone.
+fn today(st: &AppState) -> NaiveDate {
+    chrono::Utc::now().with_timezone(&st.cfg.timezone).date_naive()
 }
 
 fn can_edit(cu: &CurrentUser, m: &Media) -> bool {
@@ -212,7 +213,7 @@ pub async fn add_from_search(
         .map_err(AppError::Internal)?
         .ok_or(AppError::NotFound)?;
     let media_id = ensure_media(&st, &hit, cu.id()).await?;
-    entries::set_status(&st.pool, cu.id(), media_id, status, current_year(&st)).await?;
+    entries::set_status(&st.pool, cu.id(), media_id, status, today(&st)).await?;
     if !f.show_remove.is_empty() {
         let target = format!("{}medium/{media_id}", st.cfg.base_path());
         if is_htmx(&headers) {
@@ -246,7 +247,7 @@ pub async fn set_status(
     cu.check_csrf(&f.csrf)?;
     let status = Status::parse(&f.status).ok_or(AppError::BadRequest("error-badrequest-text"))?;
     media::get(&st.pool, id).await?.ok_or(AppError::NotFound)?;
-    entries::set_status(&st.pool, cu.id(), id, status, current_year(&st)).await?;
+    entries::set_status(&st.pool, cu.id(), id, status, today(&st)).await?;
     status_response(&st, &cu, &headers, id, &f.return_to, !f.show_remove.is_empty()).await
 }
 
@@ -265,6 +266,8 @@ pub struct YearForm {
     #[serde(default)]
     csrf: String,
     #[serde(default)]
+    date: String,
+    #[serde(default)]
     year: String,
     #[serde(default)]
     return_to: String,
@@ -272,17 +275,22 @@ pub struct YearForm {
     show_remove: String,
 }
 
-/// Prüft ein vom Benutzer eingegebenes Jahr (leer = unbekannt).
-fn parse_done_year(s: &str, current_year: i32) -> Result<Option<i32>, AppError> {
-    let s = s.trim();
-    if s.is_empty() {
-        return Ok(None);
+/// Prüft Abschlussdatum und -jahr aus einem Formular. Ein Datum hat Vorrang;
+/// beides leer = unbekannt.
+fn parse_done(date: &str, year: &str, today: NaiveDate) -> Result<Done, AppError> {
+    let bad = AppError::BadRequest("form-error-done-year");
+    let (date, year) = (date.trim(), year.trim());
+    if !date.is_empty() {
+        return NaiveDate::parse_from_str(date, "%Y-%m-%d")
+            .ok()
+            .filter(|d| d.year() >= 1900 && *d <= today)
+            .map(Done::Date)
+            .ok_or(bad);
     }
-    s.parse::<i32>()
-        .ok()
-        .filter(|y| (1900..=current_year + 1).contains(y))
-        .map(Some)
-        .ok_or(AppError::BadRequest("form-error-done-year"))
+    if year.is_empty() {
+        return Ok(Done::Unknown);
+    }
+    year.parse::<i32>().ok().filter(|y| (1900..=today.year()).contains(y)).map(Done::Year).ok_or(bad)
 }
 
 /// Ändert das Jahr, in dem der Benutzer das Medium gelesen/gehört/gesehen hat.
@@ -294,8 +302,8 @@ pub async fn set_year(
     Form(f): Form<YearForm>,
 ) -> Result<Response, AppError> {
     cu.check_csrf(&f.csrf)?;
-    let year = parse_done_year(&f.year, current_year(&st))?;
-    if !entries::set_done_year(&st.pool, cu.id(), id, year).await? {
+    let done = parse_done(&f.date, &f.year, today(&st))?;
+    if !entries::set_done(&st.pool, cu.id(), id, done).await? {
         return Err(AppError::NotFound);
     }
     status_response(&st, &cu, &headers, id, &f.return_to, !f.show_remove.is_empty()).await
@@ -548,6 +556,7 @@ pub struct FormValues {
     description: String,
     status: String,
     done_year: String,
+    done_on: String,
 }
 
 #[derive(Template)]
@@ -584,6 +593,7 @@ impl FormValues {
             description: m.description.clone().unwrap_or_default(),
             status: String::new(),
             done_year: String::new(),
+            done_on: String::new(),
         }
     }
 
@@ -691,6 +701,7 @@ async fn parse_multipart(mut mp: Multipart) -> Result<ParsedForm, AppError> {
             "description" => v.description = text,
             "status" => v.status = text,
             "done_year" => v.done_year = text,
+            "done_on" => v.done_on = text,
             _ => {}
         }
     }
@@ -711,7 +722,7 @@ pub async fn new_form(State(st): State<AppState>, cu: CurrentUser, Query(nq): Qu
         media_type: MediaType::parse(&nq.typ).unwrap_or(MediaType::Book).as_str().into(),
         title: nq.titel.chars().take(500).collect(),
         status: "wanted".into(),
-        done_year: current_year(&st).to_string(),
+        done_year: today(&st).year().to_string(),
         ..Default::default()
     };
     render(&FormPage {
@@ -752,14 +763,14 @@ pub async fn new_save(
         },
         None => None,
     };
-    let done_year = match parse_done_year(&p.values.done_year, current_year(&st)) {
-        Ok(y) => y,
+    let done = match parse_done(&p.values.done_on, &p.values.done_year, today(&st)) {
+        Ok(d) => d,
         Err(_) => return Ok(fail(ctx, p.values, "form-error-done-year")),
     };
     let id = media::insert(&st.pool, &nm, cover.as_deref(), Some(cu.id())).await?;
-    entries::set_status(&st.pool, cu.id(), id, status, current_year(&st)).await?;
+    entries::set_status(&st.pool, cu.id(), id, status, today(&st)).await?;
     if status == Status::Done {
-        entries::set_done_year(&st.pool, cu.id(), id, done_year).await?;
+        entries::set_done(&st.pool, cu.id(), id, done).await?;
     }
     Ok(Redirect::to(&format!("{}medium/{id}", st.cfg.base_path())).into_response())
 }
@@ -877,6 +888,8 @@ pub struct StatTile {
     label: String,
     class: &'static str,
     icon: &'static str,
+    /// „Meine Liste“ mit dem Filter dieser Kachel (relativ zu `ctx.base`).
+    link: String,
 }
 
 pub struct StatHead {
@@ -932,6 +945,11 @@ pub async fn stats(State(st): State<AppState>, cu: CurrentUser) -> Result<Respon
                 label: ctx.t(keys[t.index()]),
                 class: if wanted { "" } else { t.as_str() },
                 icon: if wanted { "☆" } else { type_icon(t) },
+                link: if wanted {
+                    format!("liste?typ={}&status=wanted&sort=added", t.as_str())
+                } else {
+                    format!("liste?typ={}&status=done&sort=done", t.as_str())
+                },
             });
         }
     }
